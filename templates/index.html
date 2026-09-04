@@ -15,11 +15,22 @@
             <a href="#profile" class="brand">Sheva Aquila Mahardika</a>
             <nav>
                 <a href="#profile">Profile</a>
+                <a href="#skills">Skills</a>
+
+                <!-- Switch Toggle -->
+                <div class="theme-switch-wrapper">
+                    <label class="theme-switch" for="checkbox">
+                        <input type="checkbox" id="checkbox" onclick="toggleTheme()" />
+                        <div class="slider"></div>
+                    </label>
+                    <span id="switch-label">Dark</span>
+                </div>
             </nav>
         </div>
     </header>
 
     <main>
+        <!-- SECTION ABOUT ME -->
         <section class="hero" id="profile">
             <div class="container hero-grid">
                 <div class="hero-identity">
@@ -31,7 +42,7 @@
                     <img class="avatar" src="/static/img/sheva.png" alt="Photo of Sheva Aquila Mahardika">
                 </div>
                 <div class="hero-details">
-                    <p class="bio">Mahasiswa Fakultas Ilmu Komputer Universitas Indonesia yang antusias dalam eksplorasi sistem digital dan pengembangan perangkat lunak.</p>
+                    <p class="bio">Computer Science student at Universitas Indonesia. Driving digital business strategies and growth-focused product execution. Focused on building scalable value and precision-driven results.</p>
                     <dl class="meta-list">
                         <div class="meta-row">
                             <dt>NPM</dt>
@@ -43,9 +54,30 @@
                         </div>
                     </dl>
                     <div class="social-links">
-                        <a href="https://github.com/sheva48" class="social-link">GitHub</a>
-                        <a href="https://linkedin.com/" class="social-link">LinkedIn</a>
+                        <a href="https://github.com/sheva48" class="social-link" target="_blank">GitHub</a>
+                        <a href="https://linkedin.com/" class="social-link" target="_blank">LinkedIn</a>
                         <a href="mailto:Shevaaquilaa@gmail.com" class="social-link">Email</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: SKILLS & EXPERTISE -->
+        <section class="skills" id="skills">
+            <div class="container">
+                <h2>Skills & Expertise</h2>
+                <div class="skills-grid">
+                    <div class="skill-card">
+                        <h3>Digital Business Strategy</h3>
+                        <p>Focusing on market growth, digital branding, and strategic partnership operations.</p>
+                    </div>
+                    <div class="skill-card">
+                        <h3>Product Execution</h3>
+                        <p>Translating business goals into structured, high-value digital solutions and execution plans.</p>
+                    </div>
+                    <div class="skill-card">
+                        <h3>Software Fundamentals</h3>
+                        <p>Equipped with core computer science knowledge from Universitas Indonesia to bridge tech and business.</p>
                     </div>
                 </div>
             </div>
@@ -57,5 +89,22 @@
             <p>&copy; 2026 Sheva Aquila. Fakultas Ilmu Komputer, Universitas Indonesia.</p>
         </div>
     </footer>
+
+    <!-- SCRIPT TOMBOL light and dark-->
+    <script>
+        function toggleTheme() {
+            const body = document.body;
+            const checkbox = document.getElementById('checkbox');
+            const label = document.getElementById('switch-label');
+            
+            body.classList.toggle('blue-theme');
+            
+            if (body.classList.contains('blue-theme')) {
+                label.textContent = 'Dark';
+            } else {
+                label.textContent = 'Light';
+            }
+        }
+    </script>
 </body>
 </html>
