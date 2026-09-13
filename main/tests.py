@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from main.models import Experience
+from main.models import Experience, Project
 
 
 class MainTest(TestCase):
@@ -11,6 +11,12 @@ class MainTest(TestCase):
             title="Asisten Dosen PBP",
             description="Membantu mahasiswa memahami pengembangan web.",
             category="part-time",
+        )
+        self.project = Project.objects.create(
+            title="Portofolio Pribadi",
+            description="Website portofolio pribadi berbasis Django.",
+            category="web",
+            tech_stack="Django, HTML, CSS",
         )
 
     def test_main_url_is_accessible(self):
@@ -56,3 +62,28 @@ class MainTest(TestCase):
         self.assertFalse(self.experience.is_ongoing)
         self.assertContains(response, "Selesai")
         self.assertNotContains(response, "Sedang berlangsung")
+
+    def test_project_model(self):
+        self.assertEqual(str(self.project), "Portofolio Pribadi")
+        self.assertEqual(self.project.category, "web")
+
+    def test_project_url_is_accessible(self):
+        response = self.client.get(reverse("main:show_project"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "project.html")
+
+    def test_project_page_shows_data(self):
+        response = self.client.get(reverse("main:show_project"))
+
+        self.assertContains(response, self.project.title)
+        self.assertContains(response, self.project.description)
+        self.assertContains(response, "Web Application")
+        self.assertContains(response, self.project.tech_stack)
+        self.assertContains(response, f'href="{reverse("main:show_main")}"')
+
+    def test_empty_project_page(self):
+        Project.objects.all().delete()
+        response = self.client.get(reverse("main:show_project"))
+
+        self.assertContains(response, "Belum ada project yang ditambahkan.")

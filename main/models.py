@@ -24,3 +24,22 @@ class Experience(models.Model):
     @property
     def is_ongoing(self):
         return self.ended_at is None
+
+
+class Project(models.Model):
+    PROJECT_CHOICES = [
+        ('web', 'Web Application'),
+        ('mobile', 'Mobile Application'),
+        ('data', 'Data Science'),
+        ('other', 'Other'),
+    ]
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=PROJECT_CHOICES, default='web')
+    tech_stack = models.CharField(max_length=255, blank=True)
+    link = models.URLField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
