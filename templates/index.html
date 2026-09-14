@@ -85,6 +85,72 @@
                 </div>
             </div>
         </section>
+
+        <!-- SECTION: EXPERIENCE PREVIEW -->
+        <section class="experience-section reveal" id="experience">
+            <div class="container">
+                <p class="section-kicker">Perjalanan saya sejauh ini</p>
+                <h2 class="section-title">Experience</h2>
+
+                <div class="experience-grid">
+                    {% for experience in experiences %}
+                        <article class="experience-card">
+                            <span class="experience-category">
+                                {{ experience.get_category_display }}
+                            </span>
+                            <h2>{{ experience.title }}</h2>
+                            <p class="experience-description">
+                                {{ experience.description }}
+                            </p>
+
+                            {% if experience.is_ongoing %}
+                                <p class="experience-status">Sedang berlangsung</p>
+                            {% else %}
+                                <p class="experience-status">Selesai</p>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <p class="empty-state">
+                            Belum ada pengalaman yang ditambahkan.
+                        </p>
+                    {% endfor %}
+                </div>
+
+                <a class="social-link see-all-link" href="{% url 'main:show_experience' %}">Lihat Semua Experience</a>
+            </div>
+        </section>
+
+        <!-- SECTION: PROJECT PREVIEW -->
+        <section class="experience-section reveal" id="project">
+            <div class="container">
+                <p class="section-kicker">Karya yang pernah saya bangun</p>
+                <h2 class="section-title">Project</h2>
+
+                <div class="experience-grid">
+                    {% for project in projects %}
+                        <article class="experience-card">
+                            <span class="experience-category">
+                                {{ project.get_category_display }}
+                            </span>
+                            <h2>{{ project.title }}</h2>
+                            <p class="experience-description">
+                                {{ project.description }}
+                            </p>
+
+                            {% if project.tech_stack %}
+                                <p class="experience-status">{{ project.tech_stack }}</p>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <p class="empty-state">
+                            Belum ada project yang ditambahkan.
+                        </p>
+                    {% endfor %}
+                </div>
+
+                <a class="social-link see-all-link" href="{% url 'main:show_project' %}">Lihat Semua Project</a>
+            </div>
+        </section>
     </main>
 
     <footer class="site-footer">
@@ -108,6 +174,21 @@
                 label.textContent = 'Light';
             }
         }
+
+        // Slide-in animation for sections when scrolled into view
+        document.addEventListener('DOMContentLoaded', () => {
+            const revealTargets = document.querySelectorAll('.reveal');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.15 });
+
+            revealTargets.forEach((target) => observer.observe(target));
+        });
     </script>
 </body>
 </html>

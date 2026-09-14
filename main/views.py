@@ -9,6 +9,8 @@ def show_main(request):
             "npm": "2506622033",
             "study_program": "S1 Sistem Informasi",
             "bio": "Computer Science student at Universitas Indonesia. Driving digital business strategies and growth-focused product execution. Focused on building scalable value and precision-driven results",
+            "experiences": Experience.objects.all(),
+            "projects": Project.objects.all(),
         }
         return render(request, "index.html", context)
 
