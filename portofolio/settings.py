@@ -158,3 +158,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'main',
 ]
+
+
+# gunakan https:// untuk trailing urlnya
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "https://sheva-aquila-myportofolio.pws.cs.ui.ac.id",
+]

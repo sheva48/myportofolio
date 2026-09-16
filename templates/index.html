@@ -1,37 +1,9 @@
+{% extends "base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% block meta %}
     <title>Sheva Aquila Mahardika - Portfolio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body>
-    <header class="site-header">
-        <div class="container">
-            <a href="#profile" class="brand">{{ name }} </a>
-            <nav>
-                <a href="#profile">Profile</a>
-                <a href="#skills">Skills</a>
-                <a href="{% url 'main:show_experience' %}">Experience</a>
-                <a href="{% url 'main:show_project' %}">Project</a>
-
-                <!-- Switch Toggle -->
-                <div class="theme-switch-wrapper">
-                    <label class="theme-switch" for="checkbox">
-                        <input type="checkbox" id="checkbox" onclick="toggleTheme()" />
-                        <div class="slider"></div>
-                    </label>
-                    <span id="switch-label">Dark</span>
-                </div>
-            </nav>
-        </div>
-    </header>
-
+{% endblock meta %}
+{% block content %}
     <main>
         <!-- SECTION ABOUT ME -->
         <section class="hero" id="profile">
@@ -92,31 +64,35 @@
                 <p class="section-kicker">Perjalanan saya sejauh ini</p>
                 <h2 class="section-title">Experience</h2>
 
-                <div class="experience-grid">
-                    {% for experience in experiences %}
-                        <article class="experience-card">
-                            <span class="experience-category">
-                                {{ experience.get_category_display }}
-                            </span>
-                            <h2>{{ experience.title }}</h2>
-                            <p class="experience-description">
-                                {{ experience.description }}
-                            </p>
+                {% if experiences %}
+                    <div class="preview-carousel">
+                        <div class="preview-track">
+                            {% for experience in experiences %}
+                                <article class="experience-card preview-card">
+                                    <span class="experience-category">
+                                        {{ experience.get_category_display }}
+                                    </span>
+                                    <h2>{{ experience.title }}</h2>
+                                    <p class="experience-description">
+                                        {{ experience.description }}
+                                    </p>
 
-                            {% if experience.is_ongoing %}
-                                <p class="experience-status">Sedang berlangsung</p>
-                            {% else %}
-                                <p class="experience-status">Selesai</p>
-                            {% endif %}
-                        </article>
-                    {% empty %}
-                        <p class="empty-state">
-                            Belum ada pengalaman yang ditambahkan.
-                        </p>
-                    {% endfor %}
-                </div>
+                                    {% if experience.is_ongoing %}
+                                        <p class="experience-status">Sedang berlangsung</p>
+                                    {% else %}
+                                        <p class="experience-status">Selesai</p>
+                                    {% endif %}
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="empty-state">
+                        Belum ada pengalaman yang ditambahkan.
+                    </p>
+                {% endif %}
 
-                <a class="social-link see-all-link" href="{% url 'main:show_experience' %}">Lihat Semua Experience</a>
+                <a class="social-link see-all-link" href="{% url 'main:show_experience' %}">Lihat Selengkapnya</a>
             </div>
         </section>
 
@@ -126,69 +102,34 @@
                 <p class="section-kicker">Karya yang pernah saya bangun</p>
                 <h2 class="section-title">Project</h2>
 
-                <div class="experience-grid">
-                    {% for project in projects %}
-                        <article class="experience-card">
-                            <span class="experience-category">
-                                {{ project.get_category_display }}
-                            </span>
-                            <h2>{{ project.title }}</h2>
-                            <p class="experience-description">
-                                {{ project.description }}
-                            </p>
+                {% if projects %}
+                    <div class="preview-carousel">
+                        <div class="preview-track">
+                            {% for project in projects %}
+                                <article class="experience-card preview-card">
+                                    <span class="experience-category">
+                                        {{ project.get_category_display }}
+                                    </span>
+                                    <h2>{{ project.title }}</h2>
+                                    <p class="experience-description">
+                                        {{ project.description }}
+                                    </p>
 
-                            {% if project.tech_stack %}
-                                <p class="experience-status">{{ project.tech_stack }}</p>
-                            {% endif %}
-                        </article>
-                    {% empty %}
-                        <p class="empty-state">
-                            Belum ada project yang ditambahkan.
-                        </p>
-                    {% endfor %}
-                </div>
+                                    {% if project.tech_stack %}
+                                        <p class="experience-status">{{ project.tech_stack }}</p>
+                                    {% endif %}
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="empty-state">
+                        Belum ada project yang ditambahkan.
+                    </p>
+                {% endif %}
 
-                <a class="social-link see-all-link" href="{% url 'main:show_project' %}">Lihat Semua Project</a>
+                <a class="social-link see-all-link" href="{% url 'main:show_projects' %}">Lihat Selengkapnya</a>
             </div>
         </section>
     </main>
-
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 {{ name }}. Fakultas Ilmu Komputer, Universitas Indonesia.</p>
-        </div>
-    </footer>
-
-    <!-- SCRIPT TOMBOL light and dark-->
-    <script>
-        function toggleTheme() {
-            const body = document.body;
-            const checkbox = document.getElementById('checkbox');
-            const label = document.getElementById('switch-label');
-            
-            body.classList.toggle('blue-theme');
-            
-            if (body.classList.contains('blue-theme')) {
-                label.textContent = 'Dark';
-            } else {
-                label.textContent = 'Light';
-            }
-        }
-
-        // Slide-in animation for sections when scrolled into view
-        document.addEventListener('DOMContentLoaded', () => {
-            const revealTargets = document.querySelectorAll('.reveal');
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('is-visible');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.15 });
-
-            revealTargets.forEach((target) => observer.observe(target));
-        });
-    </script>
-</body>
-</html>
+{% endblock content %}

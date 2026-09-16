@@ -1,38 +1,36 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+{% block meta %}
     <title>Project - {{ name }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body>
-    <header class="site-header">
-        <div class="container">
-            <a href="{% url 'main:show_main' %}#profile" class="brand">{{ name }}</a>
-            <nav>
-                <a href="{% url 'main:show_main' %}#profile">Profile</a>
-                <a href="{% url 'main:show_main' %}#skills">Skills</a>
-                <a href="{% url 'main:show_experience' %}">Experience</a>
-                <a href="{% url 'main:show_project' %}">Project</a>
-                <a href="{% url 'main:show_main' %}">Home</a>
-            </nav>
-        </div>
-    </header>
-
+{% endblock meta %}
+{% block content %}
     <main>
         <section class="experience-section" id="project">
             <div class="container">
-                <p class="section-kicker">Karya yang pernah saya bangun</p>
-                <h1>Project</h1>
+                <div class="project-header">
+                    <div>
+                        <p class="section-kicker">Karya yang pernah saya bangun</p>
+                        <h1>Project</h1>
+                    </div>
+                    <a href="{% url 'main:create_project' %}" class="button project-add-button">+ Tambah Project</a>
+                </div>
 
-                <div class="experience-grid">
-                    {% for project in projects %}
-                        <article class="experience-card">
+                <form method="get" class="project-search">
+                    <input
+                        type="text"
+                        name="title"
+                        class="project-search__input"
+                        placeholder="Cari project berdasarkan judul..."
+                        value="{{ request.GET.title }}"
+                    >
+                    <button type="submit" class="button">Cari</button>
+                </form>
+
+                <div class="project-grid">
+                    {% for project in project_list %}
+                        <article class="experience-card project-card">
+                            {% if project.project_image_url %}
+                                <img src="{{ project.project_image_url }}" alt="{{ project.title }}" class="project-image">
+                            {% endif %}
                             <span class="experience-category">
                                 {{ project.get_category_display }}
                             </span>
@@ -45,10 +43,18 @@
                                 <p class="experience-status">{{ project.tech_stack }}</p>
                             {% endif %}
 
-                            {% if project.link %}
-                                <a href="{{ project.link }}" target="_blank">Lihat Project</a>
-                            {% endif %}
+                            <div class="project-card-actions">
+                                {% if project.project_url %}
+                                    <a href="{{ project.project_url }}" target="_blank" class="social-link">Lihat Proyek</a>
+                                {% endif %}
+                                <button
+                                    type="button"
+                                    class="button-danger"
+                                    onclick="document.getElementById('delete-modal-{{ project.id }}').showModal()"
+                                >Hapus</button>
+                            </div>
                         </article>
+                        {% include "components/project_delete_modal.html" %}
                     {% empty %}
                         <p class="empty-state">
                             Belum ada project yang ditambahkan.
@@ -58,11 +64,4 @@
             </div>
         </section>
     </main>
-
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 {{ name }}. Fakultas Ilmu Komputer, Universitas Indonesia.</p>
-        </div>
-    </footer>
-</body>
-</html>
+{% endblock content %}

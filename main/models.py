@@ -34,11 +34,13 @@ class Project(models.Model):
         ('other', 'Other'),
     ]
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=20, choices=PROJECT_CHOICES, default='web')
     tech_stack = models.CharField(max_length=255, blank=True)
-    link = models.URLField(blank=True, null=True)
+    project_url = models.URLField(blank=True, null=True)
+    project_image_url = models.URLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
