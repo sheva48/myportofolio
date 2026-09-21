@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from main.models import Experience, Project
+from main.models import Education, Experience, Project
 
 
 class MainTest(TestCase):
@@ -18,6 +18,12 @@ class MainTest(TestCase):
             category="web",
             tech_stack="Django, HTML, CSS",
             project_url="https://github.com/sheva48/myportofolio",
+        )
+        self.education = Education.objects.create(
+            institution_name="Universitas Indonesia",
+            degree="bachelor",
+            field_of_study="Sistem Informasi",
+            start_year=2025,
         )
 
     def test_main_url_is_accessible(self):
@@ -130,3 +136,106 @@ class MainTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertContains(response, self.project.title)
+
+    def test_education_model(self):
+        self.assertEqual(
+            str(self.education), "S1 - Sarjana - Universitas Indonesia"
+        )
+        self.assertTrue(self.education.is_ongoing)
+
+    def test_education_url_is_accessible(self):
+        response = self.client.get(reverse("main:show_education"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "education.html")
+
+    def test_education_page_shows_data(self):
+        response = self.client.get(reverse("main:show_education"))
+
+        self.assertContains(response, self.education.institution_name)
+        self.assertContains(response, self.education.field_of_study)
+        self.assertContains(response, "S1 - Sarjana")
+        self.assertContains(response, "2025")
+        self.assertContains(response, "Sekarang")
+
+    def test_completed_education_shows_end_year(self):
+        self.education.end_year = 2029
+        self.education.save()
+
+        response = self.client.get(reverse("main:show_education"))
+
+        self.assertFalse(self.education.is_ongoing)
+        self.assertContains(response, "2029")
+        self.assertNotContains(response, "Sekarang")
+
+    def test_empty_education_page(self):
+        Education.objects.all().delete()
+        response = self.client.get(reverse("main:show_education"))
+
+        self.assertContains(response, "Belum ada riwayat pendidikan yang ditambahkan.")
+
+    def test_education_search_filters_by_institution(self):
+        Education.objects.create(
+            institution_name="SMA Negeri 1",
+            degree="high_school",
+            start_year=2020,
+            end_year=2023,
+        )
+
+        response = self.client.get(reverse("main:show_education"), {"institution": "Indonesia"})
+
+        self.assertContains(response, self.education.institution_name)
+        self.assertNotContains(response, "SMA Negeri 1")
+
+    def test_create_education_form_loads(self):
+        response = self.client.get(reverse("main:create_education"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "education_form.html")
+
+    def test_create_education_saves_new_education(self):
+        response = self.client.post(reverse("main:create_education"), {
+            "institution_name": "SMA Negeri 1",
+            "degree": "high_school",
+            "field_of_study": "",
+            "start_year": 2020,
+            "end_year": 2023,
+            "description": "",
+        })
+
+        self.assertRedirects(response, reverse("main:show_education"))
+        self.assertTrue(Education.objects.filter(institution_name="SMA Negeri 1").exists())
+
+    def test_update_education_form_loads_with_existing_data(self):
+        response = self.client.get(reverse("main:update_education", args=[self.education.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "education_form.html")
+        self.assertContains(response, self.education.institution_name)
+
+    def test_update_education_saves_changes(self):
+        response = self.client.post(reverse("main:update_education", args=[self.education.id]), {
+            "institution_name": "Universitas Indonesia (Updated)",
+            "degree": "bachelor",
+            "field_of_study": "Sistem Informasi",
+            "start_year": 2025,
+            "end_year": "",
+            "description": "",
+        })
+
+        self.assertRedirects(response, reverse("main:show_education"))
+        self.education.refresh_from_db()
+        self.assertEqual(self.education.institution_name, "Universitas Indonesia (Updated)")
+
+    def test_delete_education_removes_it(self):
+        response = self.client.post(reverse("main:delete_education", args=[self.education.id]))
+
+        self.assertRedirects(response, reverse("main:show_education"))
+        self.assertFalse(Education.objects.filter(id=self.education.id).exists())
+
+    def test_get_education_json_returns_data(self):
+        response = self.client.get(reverse("main:get_education_json"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertContains(response, self.education.institution_name)
