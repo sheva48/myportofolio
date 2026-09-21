@@ -57,3 +57,34 @@ Beberapa contoh prompt yang saya gunakan:
 
 2. Tolong pandu saya langkah demi langkah dalam membuat model Project baru dengan minimal tiga field, membuat migrasinya, lalu menampilkannya menggunakan perulangan Django Template Language di halaman HTML khusus project tanpa memberikan kode instan sekaligus.
 
+
+TUGAS 03
+PERTANYAAN REFLEKTIF
+
+1. Kenapa ModelForm, bukan HTML form manual? Kenapa perlu {% csrf_token %}?
+
+ModelForm otomatis generate field form dari field yang udah ada di model, jadi gak perlu nulis ulang tiap <input> manual. Validasinya juga otomatis ngikutin constraint model (max_length, choices, format URL, dll), dan udah ada method .save() buat langsung nyimpen ke DB. Kalau manual, semua validasi & proses simpan itu tanggung jawab kita sendiri lebih ribet dan gampang meleset kalau model berubah.
+
+{% csrf_token %} wajib buat nyegah Cross-Site Request Forgery biar situs lain gak bisa diam-diam ngirim request POST (misal hapus/tambah data) atas nama user yang lagi login. Django kasih token unik per-session, dan nolak POST yang gak bawa token itu (403).
+
+2. Kenapa JSON lebih disukai daripada XML?
+
+JSON lebih ringkas gak ada tag pembuka-penutup berulang kayak XML, jadi payload-nya lebih kecil dan cepat. Strukturnya juga langsung mirip objek JavaScript, jadi browser bisa langsung JSON.parse() tanpa library tambahan. Sintaksnya lebih gampang dibaca dan hampir semua bahasa modern udah dukung JSON native. XML lebih verbose dan awalnya didesain buat dokumen kompleks dengan schema/namespace, yang kebanyakan gak dibutuhin buat API sederhana.
+
+3. Alur view balikin data sebagai JSON, dan kenapa perlu serialization?
+
+View query data dari DB lewat ORM (Education.objects.all()), hasilnya QuerySet berisi objek Python (model instance), objek ini gak bisa langsung dikirim lewat HTTP karena HTTP cuma ngirim teks, makanya dipakai serializers.serialize("json", queryset) buat ubah objek jadi string JSON, dibungkus HttpResponse dan dikirim ke client.
+
+Serialization perlu karena ada gap antara representasi data di memori Python (objek spesifik Django) dengan format yang bisa dipahami universal lewat jaringan (teks). Tanpa itu, sistem lain di luar Python/Django (browser, app lain) gak bakal ngerti objeknya.
+
+AI Disclosure
+
+Untuk pengerjaan Individual Assignment 3 ini, saya memanfaatkan AI (Claude) terutama buat bantu nerapin alur Form dan Data Delivery di Django — mulai dari bikin ModelForm, function-based view buat create/update/delete, sampai serialisasi data ke JSON dan nampilinnya lagi di template. Saya juga minta AI bantu jelasin konsep di balik tiap bagian (kenapa perlu CSRF token, kenapa JSON dipakai dibanding XML, alur serialization) biar gak cuma copy-paste tapi ngerti alasannya, dan minta dipecah jadi tahapan kecil biar progress gampang di-commit bertahap. Selain itu AI juga saya pakai buat debugging waktu migrasi database sempat gagal di server production (PWS) gara-gara perubahan tipe primary key yang gak kompatibel sama PostgreSQL.
+
+Beberapa contoh prompt yang saya gunakan:
+
+Tolong jelasin dulu isi requirement Tugas 3 ini apa aja dan aku udah sampai mana, jangan langsung dikerjain dulu.
+
+Bikinin fitur CRUD lengkap (create, update, delete) plus endpoint JSON buat section Education, tapi progressnya dipecah jadi beberapa tahap dan di-commit satu-satu, bukan sekaligus.
+
+Kenapa migrasi project_url gagal di server production padahal di lokal jalan lancar? Tolong jelasin penyebabnya sebelum dibenerin.
