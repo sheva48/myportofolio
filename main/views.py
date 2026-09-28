@@ -36,6 +36,19 @@ def show_experience(request):
     return render(request, 'experience.html', context)
 
 
+# starred_by is deliberately absent: it would expose the usernames of everyone
+# who starred a project to this public, unauthenticated endpoint.
+PUBLIC_PROJECT_FIELDS = [
+    "title",
+    "description",
+    "category",
+    "tech_stack",
+    "project_url",
+    "project_image_url",
+    "created_at",
+]
+
+
 def get_projects_json(request):
     projects = Project.objects.all()
 
@@ -43,7 +56,7 @@ def get_projects_json(request):
     if title:
         projects = projects.filter(title__icontains=title)
 
-    projects_json = serializers.serialize("json", projects, use_natural_foreign_keys=True)
+    projects_json = serializers.serialize("json", projects, fields=PUBLIC_PROJECT_FIELDS)
     return HttpResponse(projects_json, content_type="application/json")
 
 

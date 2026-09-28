@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth.models import AnonymousUser, Group, User
 from django.test import TestCase
 from django.urls import reverse
@@ -173,6 +175,24 @@ class MainTest(TestCase):
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertContains(response, self.project.title)
 
+    def test_projects_json_never_exposes_who_starred(self):
+        self.project.starred_by.add(self.regular_user)
+
+        payload = json.loads(
+            self.client.get(reverse("main:get_projects_json")).content
+        )
+
+        self.assertNotIn("starred_by", payload[0]["fields"])
+        self.assertNotIn(self.regular_user.username, json.dumps(payload))
+
+    def test_education_json_never_exposes_user_data(self):
+        payload = json.loads(
+            self.client.get(reverse("main:get_education_json")).content
+        )
+
+        for username in ["admin", "visitor", "editor"]:
+            self.assertNotIn(username, json.dumps(payload))
+
     def test_toggle_star_requires_login(self):
         response = self.client.post(reverse("main:toggle_star", args=[self.project.id]))
 
@@ -190,6 +210,17 @@ class MainTest(TestCase):
 
         self.client.post(url)
         self.assertFalse(self.project.starred_by.filter(pk=self.regular_user.pk).exists())
+
+    def test_star_counts_once_per_user_and_is_shown_on_the_page(self):
+        self.project.starred_by.add(self.regular_user)
+        self.project.starred_by.add(self.regular_user)
+        self.project.starred_by.add(self.editor)
+
+        self.assertEqual(self.project.starred_by.count(), 2)
+
+        self.client.login(username="visitor", password="visitorpass123")
+        response = self.client.get(reverse("main:show_projects"))
+        self.assertContains(response, '<span class="star-count">2</span>', html=False)
 
     def test_education_model(self):
         self.assertEqual(
