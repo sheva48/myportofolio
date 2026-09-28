@@ -1,9 +1,10 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from main.models import Education, Experience, Project
+from main.permissions import EDITOR_GROUP_NAME, can_edit, is_editor, is_owner
 
 
 class MainTest(TestCase):
@@ -14,6 +15,10 @@ class MainTest(TestCase):
         self.regular_user = User.objects.create_user(
             username="visitor", password="visitorpass123"
         )
+        self.editor = User.objects.create_user(
+            username="editor", password="editorpass123"
+        )
+        self.editor.groups.add(Group.objects.get(name=EDITOR_GROUP_NAME))
 
         self.experience = Experience.objects.create(
             title="Asisten Dosen PBP",
@@ -346,3 +351,39 @@ class MainTest(TestCase):
 
         self.assertRedirects(response, reverse("main:login"))
         self.assertEqual(response.cookies["last_login"].value, "")
+
+
+class RolePermissionTest(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_superuser(
+            username="owner", password="ownerpass123"
+        )
+        self.editor = User.objects.create_user(
+            username="editor", password="editorpass123"
+        )
+        self.editor.groups.add(Group.objects.get(name=EDITOR_GROUP_NAME))
+        self.regular_user = User.objects.create_user(
+            username="visitor", password="visitorpass123"
+        )
+        self.anonymous = AnonymousUser()
+
+    def test_editor_group_is_created_by_migration(self):
+        self.assertTrue(Group.objects.filter(name=EDITOR_GROUP_NAME).exists())
+
+    def test_is_editor_only_for_group_members(self):
+        self.assertTrue(is_editor(self.editor))
+        self.assertFalse(is_editor(self.regular_user))
+        self.assertFalse(is_editor(self.owner))
+        self.assertFalse(is_editor(self.anonymous))
+
+    def test_is_owner_only_for_superuser(self):
+        self.assertTrue(is_owner(self.owner))
+        self.assertFalse(is_owner(self.editor))
+        self.assertFalse(is_owner(self.regular_user))
+        self.assertFalse(is_owner(self.anonymous))
+
+    def test_can_edit_for_editor_and_owner_only(self):
+        self.assertTrue(can_edit(self.owner))
+        self.assertTrue(can_edit(self.editor))
+        self.assertFalse(can_edit(self.regular_user))
+        self.assertFalse(can_edit(self.anonymous))
