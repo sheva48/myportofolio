@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -7,6 +8,13 @@ from main.models import Education, Experience, Project
 
 class MainTest(TestCase):
     def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="admin", password="adminpass123"
+        )
+        self.regular_user = User.objects.create_user(
+            username="visitor", password="visitorpass123"
+        )
+
         self.experience = Experience.objects.create(
             title="Asisten Dosen PBP",
             description="Membantu mahasiswa memahami pengembangan web.",
@@ -105,13 +113,15 @@ class MainTest(TestCase):
         self.assertContains(response, self.project.title)
         self.assertNotContains(response, "Lainnya")
 
-    def test_create_project_form_loads(self):
+    def test_create_project_form_loads_for_superuser(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.get(reverse("main:create_project"))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "projects_form.html")
 
     def test_create_project_saves_new_project(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.post(reverse("main:create_project"), {
             "title": "Proyek Baru",
             "description": "Deskripsi proyek baru.",
@@ -125,10 +135,31 @@ class MainTest(TestCase):
         self.assertTrue(Project.objects.filter(title="Proyek Baru").exists())
 
     def test_delete_project_removes_it(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.post(reverse("main:delete_project", args=[self.project.id]))
 
         self.assertRedirects(response, reverse("main:show_projects"))
         self.assertFalse(Project.objects.filter(id=self.project.id).exists())
+
+    def test_anonymous_cannot_create_project(self):
+        response = self.client.get(reverse("main:create_project"))
+
+        self.assertRedirects(
+            response, f"{reverse('main:login')}?next={reverse('main:create_project')}"
+        )
+
+    def test_non_superuser_cannot_create_project(self):
+        self.client.login(username="visitor", password="visitorpass123")
+        response = self.client.get(reverse("main:create_project"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_non_superuser_cannot_delete_project(self):
+        self.client.login(username="visitor", password="visitorpass123")
+        response = self.client.post(reverse("main:delete_project", args=[self.project.id]))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Project.objects.filter(id=self.project.id).exists())
 
     def test_get_projects_json_returns_data(self):
         response = self.client.get(reverse("main:get_projects_json"))
@@ -136,6 +167,24 @@ class MainTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertContains(response, self.project.title)
+
+    def test_toggle_star_requires_login(self):
+        response = self.client.post(reverse("main:toggle_star", args=[self.project.id]))
+
+        self.assertRedirects(
+            response,
+            f"{reverse('main:login')}?next={reverse('main:toggle_star', args=[self.project.id])}",
+        )
+
+    def test_toggle_star_adds_and_removes_star(self):
+        self.client.login(username="visitor", password="visitorpass123")
+        url = reverse("main:toggle_star", args=[self.project.id])
+
+        self.client.post(url)
+        self.assertTrue(self.project.starred_by.filter(pk=self.regular_user.pk).exists())
+
+        self.client.post(url)
+        self.assertFalse(self.project.starred_by.filter(pk=self.regular_user.pk).exists())
 
     def test_education_model(self):
         self.assertEqual(
@@ -187,13 +236,15 @@ class MainTest(TestCase):
         self.assertContains(response, self.education.institution_name)
         self.assertNotContains(response, "SMA Negeri 1")
 
-    def test_create_education_form_loads(self):
+    def test_create_education_form_loads_for_superuser(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.get(reverse("main:create_education"))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "education_form.html")
 
     def test_create_education_saves_new_education(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.post(reverse("main:create_education"), {
             "institution_name": "SMA Negeri 1",
             "degree": "high_school",
@@ -207,6 +258,7 @@ class MainTest(TestCase):
         self.assertTrue(Education.objects.filter(institution_name="SMA Negeri 1").exists())
 
     def test_update_education_form_loads_with_existing_data(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.get(reverse("main:update_education", args=[self.education.id]))
 
         self.assertEqual(response.status_code, 200)
@@ -214,6 +266,7 @@ class MainTest(TestCase):
         self.assertContains(response, self.education.institution_name)
 
     def test_update_education_saves_changes(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.post(reverse("main:update_education", args=[self.education.id]), {
             "institution_name": "Universitas Indonesia (Updated)",
             "degree": "bachelor",
@@ -228,10 +281,17 @@ class MainTest(TestCase):
         self.assertEqual(self.education.institution_name, "Universitas Indonesia (Updated)")
 
     def test_delete_education_removes_it(self):
+        self.client.login(username="admin", password="adminpass123")
         response = self.client.post(reverse("main:delete_education", args=[self.education.id]))
 
         self.assertRedirects(response, reverse("main:show_education"))
         self.assertFalse(Education.objects.filter(id=self.education.id).exists())
+
+    def test_non_superuser_cannot_create_education(self):
+        self.client.login(username="visitor", password="visitorpass123")
+        response = self.client.get(reverse("main:create_education"))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_get_education_json_returns_data(self):
         response = self.client.get(reverse("main:get_education_json"))
@@ -239,3 +299,50 @@ class MainTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertContains(response, self.education.institution_name)
+
+    def test_register_page_loads(self):
+        response = self.client.get(reverse("main:register"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "register.html")
+
+    def test_register_creates_new_user(self):
+        response = self.client.post(reverse("main:register"), {
+            "username": "newuser",
+            "password1": "SuperSecret123!",
+            "password2": "SuperSecret123!",
+        })
+
+        self.assertRedirects(response, reverse("main:login"))
+        self.assertTrue(User.objects.filter(username="newuser").exists())
+
+    def test_login_page_loads(self):
+        response = self.client.get(reverse("main:login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "login.html")
+
+    def test_login_sets_last_login_cookie(self):
+        response = self.client.post(reverse("main:login"), {
+            "username": "admin",
+            "password": "adminpass123",
+        })
+
+        self.assertRedirects(response, reverse("main:show_main"))
+        self.assertIn("last_login", response.cookies)
+
+    def test_login_with_wrong_credentials_shows_error(self):
+        response = self.client.post(reverse("main:login"), {
+            "username": "admin",
+            "password": "wrongpassword",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Username atau password salah.")
+
+    def test_logout_deletes_last_login_cookie(self):
+        self.client.login(username="admin", password="adminpass123")
+        response = self.client.post(reverse("main:logout"))
+
+        self.assertRedirects(response, reverse("main:login"))
+        self.assertEqual(response.cookies["last_login"].value, "")

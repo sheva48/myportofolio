@@ -1,0 +1,11 @@
+{% if user.is_authenticated %}
+    <form method="post" action="{% url 'main:toggle_star' project.id %}" class="star-form">
+        {% csrf_token %}
+        <button type="submit" class="button-star {% if project.is_starred_by_user %}is-starred{% endif %}">
+            {% if project.is_starred_by_user %}&#9733;{% else %}&#9734;{% endif %}
+        </button>
+    </form>
+{% else %}
+    <span class="button-star" title="Login untuk memberi star">&#9734;</span>
+{% endif %}
+<span class="star-count">{{ project.star_count }}</span>

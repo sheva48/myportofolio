@@ -57,6 +57,7 @@ body {
 
 .site-header nav {
     display: flex;
+    align-items: center;
     gap: 1.5rem;
 }
 
@@ -671,4 +672,71 @@ body.blue-theme input:checked + .slider {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
+}
+
+/* --- AUTH NAV --- */
+.nav-auth {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--border-color);
+}
+
+.nav-register-button {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+}
+
+.nav-username {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.nav-logout-form {
+    display: inline;
+}
+
+.nav-link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text-muted);
+    font: inherit;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.nav-link-button:hover {
+    color: var(--primary);
+}
+
+/* --- PROJECT STAR --- */
+.star-form {
+    display: inline-flex;
+}
+
+.button-star {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--text-muted);
+    padding: 0;
+}
+
+.button-star.is-starred {
+    color: #f59e0b;
+}
+
+.star-count {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-right: auto;
+    margin-left: 0.35rem;
 }

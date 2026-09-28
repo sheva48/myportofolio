@@ -30,6 +30,19 @@
                     </label>
                     <span id="switch-label">Dark</span>
                 </div>
+
+                <div class="nav-auth">
+                    {% if user.is_authenticated %}
+                        <span class="nav-username">Hai, {{ user.username }}</span>
+                        <form method="post" action="{% url 'main:logout' %}" class="nav-logout-form">
+                            {% csrf_token %}
+                            <button type="submit" class="nav-link-button">Logout</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'main:login' %}">Login</a>
+                        <a href="{% url 'main:register' %}" class="button nav-register-button">Register</a>
+                    {% endif %}
+                </div>
             </nav>
         </div>
     </header>

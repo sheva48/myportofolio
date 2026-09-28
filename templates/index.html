@@ -27,6 +27,12 @@
                             <dt>Program</dt>
                             <dd>{{ study_program }}</dd>
                         </div>
+                        {% if user.is_authenticated %}
+                            <div class="meta-row">
+                                <dt>Login Terakhir</dt>
+                                <dd>{{ last_login }}</dd>
+                            </div>
+                        {% endif %}
                     </dl>
                     <div class="social-links">
                         <a href="https://github.com/sheva48" class="social-link" target="_blank">GitHub</a>

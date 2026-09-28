@@ -11,7 +11,9 @@
                         <p class="section-kicker">Karya yang pernah saya bangun</p>
                         <h1>Project</h1>
                     </div>
-                    <a href="{% url 'main:create_project' %}" class="button project-add-button">+ Tambah Project</a>
+                    {% if user.is_superuser %}
+                        <a href="{% url 'main:create_project' %}" class="button project-add-button">+ Tambah Project</a>
+                    {% endif %}
                 </div>
 
                 <form method="get" class="project-search">
@@ -44,17 +46,22 @@
                             {% endif %}
 
                             <div class="project-card-actions">
+                                {% include "components/project_star.html" %}
                                 {% if project.project_url %}
                                     <a href="{{ project.project_url }}" target="_blank" class="social-link">Lihat Proyek</a>
                                 {% endif %}
-                                <button
-                                    type="button"
-                                    class="button-danger"
-                                    onclick="document.getElementById('delete-modal-{{ project.id }}').showModal()"
-                                >Hapus</button>
+                                {% if user.is_superuser %}
+                                    <button
+                                        type="button"
+                                        class="button-danger"
+                                        onclick="document.getElementById('delete-modal-{{ project.id }}').showModal()"
+                                    >Hapus</button>
+                                {% endif %}
                             </div>
                         </article>
-                        {% include "components/project_delete_modal.html" %}
+                        {% if user.is_superuser %}
+                            {% include "components/project_delete_modal.html" %}
+                        {% endif %}
                     {% empty %}
                         <p class="empty-state">
                             Belum ada project yang ditambahkan.

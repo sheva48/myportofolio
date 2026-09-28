@@ -11,7 +11,9 @@
                         <p class="section-kicker">Riwayat pendidikan saya</p>
                         <h1>Education</h1>
                     </div>
-                    <a href="{% url 'main:create_education' %}" class="button project-add-button">+ Tambah Riwayat</a>
+                    {% if user.is_superuser %}
+                        <a href="{% url 'main:create_education' %}" class="button project-add-button">+ Tambah Riwayat</a>
+                    {% endif %}
                 </div>
 
                 <form method="get" class="project-search">
@@ -43,16 +45,20 @@
                                 <p class="experience-description">{{ education.description }}</p>
                             {% endif %}
 
-                            <div class="project-card-actions">
-                                <a href="{% url 'main:update_education' education.id %}" class="social-link">Edit</a>
-                                <button
-                                    type="button"
-                                    class="button-danger"
-                                    onclick="document.getElementById('delete-education-modal-{{ education.id }}').showModal()"
-                                >Hapus</button>
-                            </div>
+                            {% if user.is_superuser %}
+                                <div class="project-card-actions">
+                                    <a href="{% url 'main:update_education' education.id %}" class="social-link">Edit</a>
+                                    <button
+                                        type="button"
+                                        class="button-danger"
+                                        onclick="document.getElementById('delete-education-modal-{{ education.id }}').showModal()"
+                                    >Hapus</button>
+                                </div>
+                            {% endif %}
                         </article>
-                        {% include "components/education_delete_modal.html" %}
+                        {% if user.is_superuser %}
+                            {% include "components/education_delete_modal.html" %}
+                        {% endif %}
                     {% empty %}
                         <p class="empty-state">
                             Belum ada riwayat pendidikan yang ditambahkan.
