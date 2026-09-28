@@ -11,7 +11,7 @@
                         <p class="section-kicker">Riwayat pendidikan saya</p>
                         <h1>Education</h1>
                     </div>
-                    {% if user.is_superuser %}
+                    {% if is_owner %}
                         <a href="{% url 'main:create_education' %}" class="button project-add-button">+ Tambah Riwayat</a>
                     {% endif %}
                 </div>
@@ -45,18 +45,20 @@
                                 <p class="experience-description">{{ education.description }}</p>
                             {% endif %}
 
-                            {% if user.is_superuser %}
+                            {% if can_edit %}
                                 <div class="project-card-actions">
                                     <a href="{% url 'main:update_education' education.id %}" class="social-link">Edit</a>
-                                    <button
-                                        type="button"
-                                        class="button-danger"
-                                        onclick="document.getElementById('delete-education-modal-{{ education.id }}').showModal()"
-                                    >Hapus</button>
+                                    {% if is_owner %}
+                                        <button
+                                            type="button"
+                                            class="button-danger"
+                                            onclick="document.getElementById('delete-education-modal-{{ education.id }}').showModal()"
+                                        >Hapus</button>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                         </article>
-                        {% if user.is_superuser %}
+                        {% if is_owner %}
                             {% include "components/education_delete_modal.html" %}
                         {% endif %}
                     {% empty %}

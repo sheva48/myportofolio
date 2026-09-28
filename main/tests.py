@@ -517,3 +517,93 @@ class RoleAccessTest(TestCase):
             ]:
                 with self.subTest(role=role, url=url):
                     self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class RoleButtonVisibilityTest(TestCase):
+    """Action buttons must be hidden from roles that are not allowed to use them."""
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        editor = User.objects.create_user(username="editor", password="editorpass123")
+        editor.groups.add(Group.objects.get(name=EDITOR_GROUP_NAME))
+        User.objects.create_user(username="visitor", password="visitorpass123")
+
+        self.project = Project.objects.create(
+            title="Portofolio Pribadi",
+            description="Website portofolio pribadi berbasis Django.",
+            category="web",
+        )
+        self.education = Education.objects.create(
+            institution_name="Universitas Indonesia",
+            degree="bachelor",
+            start_year=2025,
+        )
+
+    def login_as(self, role):
+        self.client.login(username=role, password=f"{role}pass123")
+
+    def project_page(self):
+        return self.client.get(reverse("main:show_projects"))
+
+    def education_page(self):
+        return self.client.get(reverse("main:show_education"))
+
+    def test_anonymous_sees_no_action_buttons(self):
+        for response, create_url in [
+            (self.project_page(), reverse("main:create_project")),
+            (self.education_page(), reverse("main:create_education")),
+        ]:
+            self.assertNotContains(response, create_url)
+            self.assertNotContains(response, "/edit/")
+            self.assertNotContains(response, "Hapus")
+
+    def test_regular_user_sees_no_action_buttons(self):
+        self.login_as("visitor")
+
+        self.assertNotContains(self.project_page(), reverse("main:create_project"))
+        self.assertNotContains(self.project_page(), "/edit/")
+        self.assertNotContains(self.education_page(), "Hapus")
+
+    def test_editor_sees_edit_but_not_create_or_delete(self):
+        self.login_as("editor")
+
+        project_response = self.project_page()
+        self.assertContains(
+            project_response, reverse("main:update_project", args=[self.project.id])
+        )
+        self.assertNotContains(project_response, reverse("main:create_project"))
+        self.assertNotContains(project_response, "Hapus")
+
+        education_response = self.education_page()
+        self.assertContains(
+            education_response,
+            reverse("main:update_education", args=[self.education.id]),
+        )
+        self.assertNotContains(education_response, reverse("main:create_education"))
+        self.assertNotContains(education_response, "Hapus")
+
+    def test_owner_sees_every_action_button(self):
+        self.login_as("owner")
+
+        project_response = self.project_page()
+        self.assertContains(project_response, reverse("main:create_project"))
+        self.assertContains(
+            project_response, reverse("main:update_project", args=[self.project.id])
+        )
+        self.assertContains(project_response, "Hapus")
+
+        education_response = self.education_page()
+        self.assertContains(education_response, reverse("main:create_education"))
+        self.assertContains(education_response, "Hapus")
+
+    def test_role_badge_shown_in_navbar(self):
+        self.login_as("owner")
+        self.assertContains(self.project_page(), "Owner")
+
+        self.client.logout()
+        self.login_as("editor")
+        self.assertContains(self.project_page(), "Editor")
+
+        self.client.logout()
+        self.login_as("visitor")
+        self.assertNotContains(self.project_page(), "role-badge")

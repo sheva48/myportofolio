@@ -11,7 +11,7 @@
                         <p class="section-kicker">Karya yang pernah saya bangun</p>
                         <h1>Project</h1>
                     </div>
-                    {% if user.is_superuser %}
+                    {% if is_owner %}
                         <a href="{% url 'main:create_project' %}" class="button project-add-button">+ Tambah Project</a>
                     {% endif %}
                 </div>
@@ -50,7 +50,10 @@
                                 {% if project.project_url %}
                                     <a href="{{ project.project_url }}" target="_blank" class="social-link">Lihat Proyek</a>
                                 {% endif %}
-                                {% if user.is_superuser %}
+                                {% if can_edit %}
+                                    <a href="{% url 'main:update_project' project.id %}" class="social-link">Edit</a>
+                                {% endif %}
+                                {% if is_owner %}
                                     <button
                                         type="button"
                                         class="button-danger"
@@ -59,7 +62,7 @@
                                 {% endif %}
                             </div>
                         </article>
-                        {% if user.is_superuser %}
+                        {% if is_owner %}
                             {% include "components/project_delete_modal.html" %}
                         {% endif %}
                     {% empty %}

@@ -33,7 +33,14 @@
 
                 <div class="nav-auth">
                     {% if user.is_authenticated %}
-                        <span class="nav-username">Hai, {{ user.username }}</span>
+                        <span class="nav-username">
+                            Hai, {{ user.username }}
+                            {% if is_owner %}
+                                <span class="role-badge role-badge--owner">Owner</span>
+                            {% elif is_editor %}
+                                <span class="role-badge role-badge--editor">Editor</span>
+                            {% endif %}
+                        </span>
                         <form method="post" action="{% url 'main:logout' %}" class="nav-logout-form">
                             {% csrf_token %}
                             <button type="submit" class="nav-link-button">Logout</button>
