@@ -88,3 +88,17 @@ Tolong jelasin dulu isi requirement Tugas 3 ini apa aja dan aku udah sampai mana
 Bikinin fitur CRUD lengkap (create, update, delete) plus endpoint JSON buat section Education, tapi progressnya dipecah jadi beberapa tahap dan di-commit satu-satu, bukan sekaligus.
 
 Kenapa migrasi project_url gagal di server production padahal di lokal jalan lancar? Tolong jelasin penyebabnya sebelum dibenerin.
+
+
+TUGAS 04
+
+Untuk pengerjaan Individual Assignment 4 ini, saya memanfaatkan AI (Claude) buat bantu nerapin authentication, session/cookies, dan authorization berbasis role di Django mulai dari register/login/logout, cookie last_login, sampai bikin role Editor pakai Django Group dan ngatur empat tingkat akses (pengunjung anonim, user biasa, Editor, dan owner). Sebelum mulai ngoding, saya minta AI jelasin dulu isi requirement tugasnya dan bandingin sama kode yang udah ada, jadi ketahuan mana yang belum dikerjain ternyata fitur update untuk Project belum pernah ada sama sekali. Di akhir, AI bantu saya nemuin celah di endpoint JSON publik yang ternyata ngebocorin username semua orang yang nge-star sebuah project, lalu saya benerin dengan membatasi field mana aja yang boleh keluar ke publik.
+
+Beberapa contoh prompt yang saya gunakan:
+
+Jelasin dulu isi tugas ini apa aja dan aku udah sampai mana.
+
+
+Endpoint JSON-nya aman gak? Cek apakah ada data user yang kebocoran ke publik.
+
+
