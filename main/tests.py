@@ -387,3 +387,133 @@ class RolePermissionTest(TestCase):
         self.assertTrue(can_edit(self.editor))
         self.assertFalse(can_edit(self.regular_user))
         self.assertFalse(can_edit(self.anonymous))
+
+
+class RoleAccessTest(TestCase):
+    """The four access tiers required by Tugas 4, exercised through the views."""
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        editor = User.objects.create_user(username="editor", password="editorpass123")
+        editor.groups.add(Group.objects.get(name=EDITOR_GROUP_NAME))
+        User.objects.create_user(username="visitor", password="visitorpass123")
+
+        self.project = Project.objects.create(
+            title="Portofolio Pribadi",
+            description="Website portofolio pribadi berbasis Django.",
+            category="web",
+        )
+        self.education = Education.objects.create(
+            institution_name="Universitas Indonesia",
+            degree="bachelor",
+            start_year=2025,
+        )
+
+        self.update_project_url = reverse("main:update_project", args=[self.project.id])
+        self.delete_project_url = reverse("main:delete_project", args=[self.project.id])
+        self.update_education_url = reverse(
+            "main:update_education", args=[self.education.id]
+        )
+        self.delete_education_url = reverse(
+            "main:delete_education", args=[self.education.id]
+        )
+
+    def login_as(self, role):
+        self.client.login(username=role, password=f"{role}pass123")
+
+    def test_anonymous_is_redirected_to_login_for_every_action(self):
+        for url in [
+            reverse("main:create_project"),
+            self.update_project_url,
+            self.delete_project_url,
+            reverse("main:create_education"),
+            self.update_education_url,
+            self.delete_education_url,
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertRedirects(response, f"{reverse('main:login')}?next={url}")
+
+    def test_regular_user_is_forbidden_from_every_action(self):
+        self.login_as("visitor")
+
+        for url in [
+            reverse("main:create_project"),
+            self.update_project_url,
+            self.delete_project_url,
+            reverse("main:create_education"),
+            self.update_education_url,
+            self.delete_education_url,
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_editor_may_open_edit_forms(self):
+        self.login_as("editor")
+
+        self.assertEqual(self.client.get(self.update_project_url).status_code, 200)
+        self.assertEqual(self.client.get(self.update_education_url).status_code, 200)
+
+    def test_editor_may_not_create_or_delete(self):
+        self.login_as("editor")
+
+        for url in [
+            reverse("main:create_project"),
+            self.delete_project_url,
+            reverse("main:create_education"),
+            self.delete_education_url,
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_editor_can_save_project_changes(self):
+        self.login_as("editor")
+        response = self.client.post(self.update_project_url, {
+            "title": "Judul Hasil Edit Editor",
+            "description": self.project.description,
+            "category": "web",
+            "tech_stack": "",
+            "project_url": "",
+            "project_image_url": "",
+        })
+
+        self.assertRedirects(response, reverse("main:show_projects"))
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, "Judul Hasil Edit Editor")
+
+    def test_editor_cannot_delete_project(self):
+        self.login_as("editor")
+        response = self.client.post(self.delete_project_url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_owner_can_update_and_delete_project(self):
+        self.login_as("owner")
+
+        response = self.client.post(self.update_project_url, {
+            "title": "Judul Hasil Edit Owner",
+            "description": self.project.description,
+            "category": "web",
+            "tech_stack": "",
+            "project_url": "",
+            "project_image_url": "",
+        })
+        self.assertRedirects(response, reverse("main:show_projects"))
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, "Judul Hasil Edit Owner")
+
+        self.client.post(self.delete_project_url)
+        self.assertFalse(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_every_role_can_read_public_pages(self):
+        for role in [None, "visitor", "editor", "owner"]:
+            if role:
+                self.login_as(role)
+            for url in [
+                reverse("main:show_main"),
+                reverse("main:show_projects"),
+                reverse("main:show_education"),
+            ]:
+                with self.subTest(role=role, url=url):
+                    self.assertEqual(self.client.get(url).status_code, 200)

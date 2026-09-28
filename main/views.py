@@ -5,12 +5,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core import serializers
-from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from main.forms import EducationForm, ProjectForm
 from main.models import Education, Experience, Project
+from main.permissions import can_edit, is_owner, role_required
 
 
 def show_main(request):
@@ -66,11 +66,8 @@ def show_projects(request):
     return render(request, 'project.html', context)
 
 
-@login_required(login_url="/login/")
+@role_required(is_owner)
 def create_project(request):
-    if not request.user.is_superuser:
-        raise PermissionDenied
-
     form = ProjectForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
@@ -85,11 +82,26 @@ def create_project(request):
     return render(request, "projects_form.html", context)
 
 
-@login_required(login_url="/login/")
-def delete_project(request, project_id):
-    if not request.user.is_superuser:
-        raise PermissionDenied
+@role_required(can_edit)
+def update_project(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    form = ProjectForm(request.POST or None, instance=project)
 
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Proyek berhasil diperbarui!")
+        return redirect("main:show_projects")
+
+    context = {
+        "name": "Sheva Aquila Mahardika",
+        "form": form,
+        "project": project,
+    }
+    return render(request, "projects_form.html", context)
+
+
+@role_required(is_owner)
+def delete_project(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
 
     if request.method == "POST":
@@ -135,11 +147,8 @@ def show_education(request):
     return render(request, 'education.html', context)
 
 
-@login_required(login_url="/login/")
+@role_required(is_owner)
 def create_education(request):
-    if not request.user.is_superuser:
-        raise PermissionDenied
-
     form = EducationForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
@@ -154,11 +163,8 @@ def create_education(request):
     return render(request, "education_form.html", context)
 
 
-@login_required(login_url="/login/")
+@role_required(can_edit)
 def update_education(request, education_id):
-    if not request.user.is_superuser:
-        raise PermissionDenied
-
     education = get_object_or_404(Education, pk=education_id)
     form = EducationForm(request.POST or None, instance=education)
 
@@ -175,11 +181,8 @@ def update_education(request, education_id):
     return render(request, "education_form.html", context)
 
 
-@login_required(login_url="/login/")
+@role_required(is_owner)
 def delete_education(request, education_id):
-    if not request.user.is_superuser:
-        raise PermissionDenied
-
     education = get_object_or_404(Education, pk=education_id)
 
     if request.method == "POST":

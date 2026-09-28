@@ -2,7 +2,7 @@ from django.urls import path
 
 from main.views import (
     show_main, show_experience, show_projects,
-    create_project, get_projects_json, delete_project, toggle_star,
+    create_project, update_project, get_projects_json, delete_project, toggle_star,
     show_education, create_education, update_education,
     delete_education, get_education_json,
     register, login_user, logout_user,
@@ -16,6 +16,7 @@ urlpatterns = [
     path("projects/", show_projects, name="show_projects"),
     path("projects/add/", create_project, name="create_project"),
     path("api/projects/", get_projects_json, name="get_projects_json"),
+    path("projects/<int:project_id>/edit/", update_project, name="update_project"),
     path("projects/<int:project_id>/delete/", delete_project, name="delete_project"),
     path("projects/<int:project_id>/star/", toggle_star, name="toggle_star"),
     path("education/", show_education, name="show_education"),
