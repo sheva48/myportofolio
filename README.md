@@ -101,4 +101,39 @@ Jelasin dulu isi tugas ini apa aja dan aku udah sampai mana.
 
 Endpoint JSON-nya aman gak? Cek apakah ada data user yang kebocoran ke publik.
 
+TUGAS 05
+
+1. Apa itu debouncing dan kenapa penting di pencarian AJAX?
+
+Debouncing adalah teknik untuk menunda eksekusi sebuah fungsi sampai ada jeda waktu tertentu tanpa event baru. Selama user masih ngetik, timer sebelumnya dibatalin terus dimulai ulang, jadi fungsinya akan baru benar-benar jalan setelah user berhenti ngetik sejenak.
+
+Hal berikut penting di pencarian AJAX karena tanpa debouncing, setiap karakter yang diketik bakal ngirim satu request. Ngetik "Django" saja berarti enam request beruntun ke server, padahal lima di antaranya langsung basi. Selain boros buat server, ini juga bikin masalah urutan: response dari ketikan lama bisa datang belakangan dan nimpa hasil pencarian yang lebih baru. Di proyek ini saya pakai jeda 300ms, cukup singkat biar tetap terasa responsif tapi cukup panjang buat nahan request berulang. Saya juga nambahin AbortController buat ngebatalin request lama yang belum selesai, jadi hasil yang usang gak mungkin nimpa yang terbaru.
+
+2. Fungsi await di fetch() dan apa jadinya kalau gak dipakai?
+
+fetch() itu gak langsung balikin datanya, tapi balikin Promise semacam janji bahwa datanya bakal ada nanti. await fungsinya nahan jalannya fungsi async sampai Promise itu selesai, baru ngasih nilai aslinya, yaitu object Response.
+
+Kalau await tidak dipakai, variabelnya bakal keisi object Promise, bukan Response. Jadi response.ok nilainya undefined dan response.json() bakal error karena Promise gak punya method itu. Selain itu kode di bawahnya langsung jalan padahal datanya belum sampai, jadi hasilnya kosong. response.json() sendiri juga balikin Promise, makanya dia juga perlu await.
+
+Sebenarnya await ini cuma cara penulisan yang lebih rapi dari .then(). Dua-duanya nunggu Promise selesai, tapi await bikin alurnya kebaca dari atas ke bawah kayak kode biasa, dan error-nya bisa ditangkap pakai try...catch biasa.
+
+3. Apa itu XSS dan kenapa data lewat AJAX lebih rentan daripada lewat template Django?
+
+Cross-Site Scripting adalah serangan ketika penyerang berhasil menyisipkan kode JavaScript miliknya ke halaman web, lalu kode itu dijalankan di browser pengguna lain. Jenis yang dipakai di tutorial adalah stored XSS, yaitu kode jahatnya tersimpan di database (misalnya sebagai nama institusi) dan ikut dieksekusi tiap kali data itu ditampilkan. Dampaknya bukan sekadar munculnya alert: cookie csrftoken bisa dibaca JavaScript, jadi kode sisipan bisa ngirim permintaan POST atas nama korban, misalnya ngehapus data kalau korbannya pemilik portofolio.
+
+Data lewat template Django relatif aman karena Django otomatis melakukan auto-escaping pada setiap variabel. Karakter < dan > diubah jadi &lt; dan &gt;, sehingga browser nampmenampilkan tag HTML sebagai teks biasa, bukan sebagai kode. Perlindungan otomatis itu hilang begitu data dirakit sendiri lewat JavaScript, karena nilai dari JSON disisipin ke template literal lalu dipasang pakai innerHTML — dan innerHTML memang mengartikan isinya sebagai HTML sungguhan. Gak ada lagi Django yang nyaring di tengah jalan. Karena itu di proyek ini saya nulis fungsi escapeHtml sendiri dan ngebungkus setiap nilai teks yang masuk ke HTML, plus nambahin strip_tags pada method clean_<field> di ModelForm sebagai lapisan kedua di sisi server.
+
+AI Disclosure
+
+Untuk Individual Assignment 5 ini saya memakai AI (Claude) sebagai pasangan kerja dalam menulis implementasi, sementara arah dan keputusan teknisnya saya yang pegang. Pertama, saya menolak memakai UUID pada id Project seperti di tutorial, dan memilih tetap integer. Alasannya pada tugas sebelumnya migrasi UUID sempat menggagalkan deployment di PWS karena PostgreSQL tidak bisa mengonversi kolom integer yang sudah berisi data.
+
+Kedua, tutorial meminta endpoint JSON menampilkan starred_by_names, yaitu daftar username pemberi star. Saya menolak menerapkannya apa adanya karena endpoint itu publik dan pada Tugas 4 saya justru menutup kebocoran yang sama. Saya memilih jalan tengah: field-nya tetap ada, tapi isinya hanya keluar untuk pemilik portofolio.
+
+Peran AI terbesar ada pada penulisan kode implementasi: view AJAX, skrip fetch beserta penanganan loading/kosong/error, debouncing, modal, serta lapisan perlindungan XSS. Saya juga meminta penjelasan konsep di balik tiap bagian, misalnya kenapa serializers.serialize tidak bisa dipakai lagi ketika data harus membawa status star pengguna yang sedang login, supaya saya paham alasannya dan bukan sekadar menyalin. Hasilnya saya periksa lewat tampilan di browser, dan beberapa kali saya minta perbaiki, misalnya posisi tombol Login dan Register yang tidak sejajar, serta kartu yang tampil ganda pada carousel halaman utama.
+
+Beberapa contoh prompt yang saya gunakan:
+
+Endpoint JSON-nya aman tidak? Cek apakah ada data pengguna yang bocor ke publik.
+
+Uji perlindungan XSS-nya dengan payload yang ada di tutorial, lalu tunjukkan data yang akhirnya tersimpan di database.
 
