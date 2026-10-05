@@ -908,3 +908,66 @@ class CreateEducationAjaxTest(TestCase):
         self.assertNotContains(
             self.client.get(reverse("main:show_education")), "Tambah Riwayat Pendidikan"
         )
+
+
+class EducationXssTest(TestCase):
+    """Both XSS layers for the Education section (Tugas 5)."""
+
+    XSS_PAYLOAD = "<img src=x onerror=alert('XSS!')>"
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        self.client.login(username="owner", password="ownerpass123")
+        self.url = reverse("main:create_education_ajax")
+        self.payload = {
+            "institution_name": "Universitas Indonesia",
+            "degree": "bachelor",
+            "field_of_study": "",
+            "start_year": 2025,
+            "end_year": "",
+            "description": "",
+        }
+
+    def test_institution_name_that_is_only_html_is_rejected(self):
+        response = self.client.post(
+            self.url, {**self.payload, "institution_name": self.XSS_PAYLOAD}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("institution_name", json.loads(response.content)["errors"])
+        self.assertFalse(Education.objects.exists())
+
+    def test_tags_are_stripped_from_saved_text(self):
+        self.client.post(self.url, {
+            **self.payload,
+            "field_of_study": "<b>Sistem Informasi</b>",
+            "description": "Halo <b>dunia</b> <script>alert(1)</script>",
+        })
+
+        education = Education.objects.get(institution_name="Universitas Indonesia")
+        self.assertEqual(education.field_of_study, "Sistem Informasi")
+        self.assertNotIn("<", education.description)
+        self.assertIn("Halo dunia", education.description)
+
+    def test_stripping_also_applies_to_the_non_ajax_form(self):
+        # create_education and create_education_ajax share EducationForm, so the
+        # same cleaning has to protect the plain form submission too.
+        self.client.post(reverse("main:create_education"), {
+            **self.payload,
+            "institution_name": "Kampus <b>Lain</b>",
+        })
+
+        self.assertTrue(Education.objects.filter(institution_name="Kampus Lain").exists())
+
+    def test_rows_stored_before_the_cleaning_existed_are_still_served_raw(self):
+        # strip_tags only guards new input; a row written straight to the database
+        # keeps its markup, which is why escapeHtml on display is the real defence.
+        Education.objects.create(
+            institution_name=self.XSS_PAYLOAD, degree="bachelor", start_year=2025
+        )
+
+        payload = json.loads(
+            self.client.get(reverse("main:get_education_json")).content
+        )
+
+        self.assertEqual(payload[0]["fields"]["institution_name"], self.XSS_PAYLOAD)
