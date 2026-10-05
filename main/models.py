@@ -66,6 +66,9 @@ class Education(models.Model):
     end_year = models.PositiveIntegerField(blank=True, null=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    starred_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="starred_educations", blank=True
+    )
 
     def __str__(self):
         return f"{self.get_degree_display()} - {self.institution_name}"

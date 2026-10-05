@@ -752,3 +752,79 @@ class CreateProjectAjaxTest(TestCase):
         project = Project.objects.get(title="Proyek AJAX")
         self.assertNotIn("<", project.description)
         self.assertIn("Halo dunia", project.description)
+
+
+class EducationStarAndJsonTest(TestCase):
+    """Education gains the star feature and a hand-built JSON payload (Tugas 5)."""
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        User.objects.create_user(username="visitor", password="visitorpass123")
+
+        self.education = Education.objects.create(
+            institution_name="Universitas Indonesia",
+            degree="bachelor",
+            field_of_study="Sistem Informasi",
+            start_year=2025,
+        )
+        self.star_url = reverse("main:toggle_star_education", args=[self.education.id])
+        self.json_url = reverse("main:get_education_json")
+
+    def json_payload(self):
+        return json.loads(self.client.get(self.json_url).content)
+
+    def test_json_carries_the_education_fields(self):
+        fields = self.json_payload()[0]["fields"]
+
+        self.assertEqual(fields["institution_name"], "Universitas Indonesia")
+        self.assertEqual(fields["degree"], "S1 - Sarjana")
+        self.assertEqual(fields["field_of_study"], "Sistem Informasi")
+        self.assertEqual(fields["start_year"], 2025)
+        self.assertTrue(fields["is_ongoing"])
+
+    def test_json_search_filters_by_institution(self):
+        Education.objects.create(
+            institution_name="SMA Negeri 1", degree="high_school", start_year=2020
+        )
+
+        payload = json.loads(
+            self.client.get(self.json_url, {"institution": "Indonesia"}).content
+        )
+
+        names = [item["fields"]["institution_name"] for item in payload]
+        self.assertEqual(names, ["Universitas Indonesia"])
+
+    def test_star_requires_login(self):
+        response = self.client.post(self.star_url)
+
+        self.assertRedirects(response, f"{reverse('main:login')}?next={self.star_url}")
+        self.assertEqual(self.education.starred_by.count(), 0)
+
+    def test_star_toggles_and_counts_once_per_user(self):
+        self.client.login(username="visitor", password="visitorpass123")
+
+        self.client.post(self.star_url)
+        self.client.post(self.star_url)
+        self.client.post(self.star_url)
+
+        self.assertEqual(self.education.starred_by.count(), 1)
+        fields = self.json_payload()[0]["fields"]
+        self.assertEqual(fields["star_count"], 1)
+        self.assertTrue(fields["is_starred"])
+
+    def test_is_starred_is_false_for_other_viewers(self):
+        visitor = User.objects.get(username="visitor")
+        self.education.starred_by.add(visitor)
+
+        self.assertFalse(self.json_payload()[0]["fields"]["is_starred"])
+
+    def test_starred_names_are_owner_only(self):
+        visitor = User.objects.get(username="visitor")
+        self.education.starred_by.add(visitor)
+
+        self.assertEqual(self.json_payload()[0]["fields"]["starred_by_names"], "")
+
+        self.client.login(username="owner", password="ownerpass123")
+        self.assertEqual(
+            self.json_payload()[0]["fields"]["starred_by_names"], "visitor"
+        )

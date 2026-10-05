@@ -45,6 +45,10 @@
                                 <p class="experience-description">{{ education.description }}</p>
                             {% endif %}
 
+                            <div class="project-card-actions">
+                                {% include "components/education_star.html" %}
+                            </div>
+
                             {% if can_edit %}
                                 <div class="project-card-actions">
                                     <a href="{% url 'main:update_education' education.id %}" class="social-link">Edit</a>

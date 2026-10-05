@@ -4,8 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.core import serializers
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -167,19 +166,65 @@ def toggle_star(request, project_id):
 
 
 def get_education_json(request):
-    educations = Education.objects.all()
+    institution_query = request.GET.get("institution", "").strip()
+    educations = Education.objects.prefetch_related("starred_by").all()
 
-    institution = request.GET.get("institution", "")
-    if institution:
-        educations = educations.filter(institution_name__icontains=institution)
+    if institution_query:
+        educations = educations.filter(institution_name__icontains=institution_query)
 
-    education_json = serializers.serialize("json", educations)
-    return HttpResponse(education_json, content_type="application/json")
+    data = []
+    for education in educations:
+        starred_users = list(education.starred_by.all())
+        is_starred = request.user in starred_users if request.user.is_authenticated else False
+
+        # Same rule as the projects endpoint: this is public, so only the owner
+        # gets the names, otherwise anyone could enumerate registered accounts.
+        starred_by_names = (
+            ", ".join(user.username for user in starred_users)
+            if is_owner(request.user)
+            else ""
+        )
+
+        data.append({
+            "pk": str(education.id),
+            "fields": {
+                "institution_name": education.institution_name,
+                "degree": education.get_degree_display(),
+                "field_of_study": education.field_of_study,
+                "start_year": education.start_year,
+                "end_year": education.end_year,
+                "is_ongoing": education.is_ongoing,
+                "description": education.description,
+                "star_count": len(starred_users),
+                "is_starred": is_starred,
+                "starred_by_names": starred_by_names,
+            },
+        })
+
+    return JsonResponse(data, safe=False)
+
+
+@login_required(login_url="/login/")
+def toggle_star_education(request, education_id):
+    education = get_object_or_404(Education, pk=education_id)
+
+    if request.method == "POST":
+        if education.starred_by.filter(pk=request.user.pk).exists():
+            education.starred_by.remove(request.user)
+        else:
+            education.starred_by.add(request.user)
+
+    return redirect("main:show_education")
 
 
 def show_education(request):
-    response = get_education_json(request)
-    education_list = [entry.object for entry in serializers.deserialize("json", response.content)]
+    institution_query = request.GET.get("institution", "").strip()
+    education_list = Education.objects.prefetch_related("starred_by").all()
+
+    if institution_query:
+        education_list = education_list.filter(
+            institution_name__icontains=institution_query
+        )
 
     context = {
         'name': 'Sheva Aquila Mahardika',

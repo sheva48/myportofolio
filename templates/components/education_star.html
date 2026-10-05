@@ -1,0 +1,11 @@
+{% if user.is_authenticated %}
+    <form method="post" action="{% url 'main:toggle_star_education' education.id %}" class="star-form">
+        {% csrf_token %}
+        <button type="submit" class="button-star {% if education in user.starred_educations.all %}is-starred{% endif %}">
+            {% if education in user.starred_educations.all %}&#9733;{% else %}&#9734;{% endif %}
+        </button>
+    </form>
+{% else %}
+    <span class="button-star" title="Login untuk memberi star">&#9734;</span>
+{% endif %}
+<span class="star-count">{{ education.starred_by.count }}</span>
