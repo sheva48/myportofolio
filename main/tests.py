@@ -834,3 +834,77 @@ class EducationStarAndJsonTest(TestCase):
         self.assertEqual(
             self.json_payload()[0]["fields"]["starred_by_names"], "visitor"
         )
+
+
+class CreateEducationAjaxTest(TestCase):
+    """The AJAX add-education endpoint (Tugas 5)."""
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        User.objects.create_user(username="visitor", password="visitorpass123")
+        editor = User.objects.create_user(username="editor", password="editorpass123")
+        editor.groups.add(Group.objects.get(name=EDITOR_GROUP_NAME))
+
+        self.url = reverse("main:create_education_ajax")
+        self.valid_payload = {
+            "institution_name": "SMA Negeri 1",
+            "degree": "high_school",
+            "field_of_study": "IPA",
+            "start_year": 2020,
+            "end_year": 2023,
+            "description": "",
+        }
+
+    def test_owner_gets_201_and_the_record_is_saved(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        response = self.client.post(self.url, self.valid_payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertTrue(Education.objects.filter(institution_name="SMA Negeri 1").exists())
+
+    def test_invalid_input_gets_400_with_field_errors(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        response = self.client.post(self.url, {**self.valid_payload, "start_year": ""})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("start_year", json.loads(response.content)["errors"])
+        self.assertFalse(Education.objects.exists())
+
+    def test_anonymous_regular_and_editor_all_get_a_json_403(self):
+        # Editors may update existing entries but never create, so they are
+        # refused here just like an anonymous visitor.
+        for role, password in [
+            (None, None),
+            ("visitor", "visitorpass123"),
+            ("editor", "editorpass123"),
+        ]:
+            with self.subTest(role=role):
+                if role:
+                    self.client.login(username=role, password=password)
+
+                response = self.client.post(self.url, self.valid_payload)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertIn("message", json.loads(response.content))
+                self.assertFalse(Education.objects.exists())
+                self.client.logout()
+
+    def test_get_is_not_allowed(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_modal_is_rendered_for_the_owner_only(self):
+        self.client.login(username="owner", password="ownerpass123")
+        self.assertContains(
+            self.client.get(reverse("main:show_education")), "Tambah Riwayat Pendidikan"
+        )
+
+        self.client.logout()
+        self.client.login(username="editor", password="editorpass123")
+        self.assertNotContains(
+            self.client.get(reverse("main:show_education")), "Tambah Riwayat Pendidikan"
+        )

@@ -222,8 +222,31 @@ def show_education(request):
         "name": "Sheva Aquila Mahardika",
         "npm": "2506622033",
         "institution_query": request.GET.get("institution", "").strip(),
+        "form": EducationForm(),
     }
     return render(request, "education.html", context)
+
+
+# Same reasoning as create_project_ajax: no @login_required, because its redirect
+# to the login page comes back to fetch() as a 200 HTML page instead of a failure.
+@require_POST
+def create_education_ajax(request):
+    if not is_owner(request.user):
+        return JsonResponse(
+            {"message": "Hanya pemilik portofolio yang dapat menambahkan riwayat pendidikan."},
+            status=403,
+        )
+
+    form = EducationForm(request.POST)
+
+    if form.is_valid():
+        education = form.save()
+        return JsonResponse(
+            {"message": "Riwayat pendidikan berhasil ditambahkan.", "pk": str(education.id)},
+            status=201,
+        )
+
+    return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
 
 
 @role_required(is_owner)

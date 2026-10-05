@@ -6,6 +6,7 @@ from main.views import (
     delete_project, toggle_star,
     show_education, create_education, update_education,
     delete_education, get_education_json, toggle_star_education,
+    create_education_ajax,
     register, login_user, logout_user,
 )
 
@@ -23,6 +24,7 @@ urlpatterns = [
     path("projects/<int:project_id>/star/", toggle_star, name="toggle_star"),
     path("education/", show_education, name="show_education"),
     path("education/add/", create_education, name="create_education"),
+    path("education/add-ajax/", create_education_ajax, name="create_education_ajax"),
     path("education/<int:education_id>/edit/", update_education, name="update_education"),
     path("education/<int:education_id>/delete/", delete_education, name="delete_education"),
     path("education/<int:education_id>/star/", toggle_star_education, name="toggle_star_education"),

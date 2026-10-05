@@ -12,7 +12,12 @@
                         <h1>Education</h1>
                     </div>
                     {% if is_owner %}
-                        <a href="{% url 'main:create_education' %}" class="button project-add-button">+ Tambah Riwayat</a>
+                        <button type="button"
+                                class="button project-add-button"
+                                popovertarget="add-education-modal">
+                            <span aria-hidden="true">+</span>
+                            Tambah Riwayat
+                        </button>
                     {% endif %}
                 </div>
 
@@ -44,8 +49,13 @@
         </section>
     </main>
 
+    {% if is_owner %}
+        {% include "components/education_form_modal.html" %}
+    {% endif %}
+
     <script>
         const EDUCATION_ENDPOINT = "{% url 'main:get_education_json' %}";
+        const CREATE_EDUCATION_ENDPOINT = "{% url 'main:create_education_ajax' %}";
         const EDU_IS_OWNER = "{{ is_owner|yesno:'true,false' }}" === "true";
         const EDU_CAN_EDIT = "{{ can_edit|yesno:'true,false' }}" === "true";
         const EDU_IS_AUTHENTICATED = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
@@ -60,6 +70,7 @@
         const eduGridContainer = document.getElementById('education-grid');
         const eduSearchForm = document.getElementById('education-search-form');
         const eduSearchInput = document.getElementById('education-search-input');
+        const educationForm = document.getElementById('education-form');
 
         function displayEducationSection({ showLoading = false, showError = false, showEmpty = false, showGrid = false }) {
             eduLoadingState.classList.toggle('hide', !showLoading);
@@ -182,6 +193,50 @@
             clearTimeout(educationDebounceTimer);
             searchEducation();
         });
+
+        function closeEducationModal() {
+            document.getElementById("add-education-modal").hidePopover();
+        }
+
+        async function addEducation(event) {
+            event.preventDefault();
+
+            const submitButton = educationForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+
+            try {
+                const response = await fetch(CREATE_EDUCATION_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                    body: new FormData(educationForm),
+                });
+
+                const result = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    educationForm.reset();
+                    closeEducationModal();
+                    showToast('Berhasil', 'Riwayat pendidikan berhasil ditambahkan!', 'success');
+                    fetchEducation(eduSearchInput.value.trim());
+                } else {
+                    const errorMessages = result.errors
+                        ? Object.values(result.errors).flat().map(error => error.message)
+                        : [result.message || `Terjadi kesalahan (status ${response.status}).`];
+                    showToast('Gagal menambahkan riwayat', errorMessages.join(' '), 'error');
+                }
+            } catch (error) {
+                console.error('Error adding education:', error);
+                showToast('Gagal menambahkan riwayat', 'Tidak dapat terhubung ke server. Silakan coba lagi.', 'error');
+            } finally {
+                submitButton.disabled = false;
+            }
+        }
+
+        // The modal renders for the owner only, so this is null for everyone else;
+        // an unguarded addEventListener would throw and stop fetchEducation below.
+        if (educationForm) {
+            educationForm.addEventListener('submit', addEducation);
+        }
 
         fetchEducation(eduSearchInput.value.trim());
     </script>
