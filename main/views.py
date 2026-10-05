@@ -218,20 +218,12 @@ def toggle_star_education(request, education_id):
 
 
 def show_education(request):
-    institution_query = request.GET.get("institution", "").strip()
-    education_list = Education.objects.prefetch_related("starred_by").all()
-
-    if institution_query:
-        education_list = education_list.filter(
-            institution_name__icontains=institution_query
-        )
-
     context = {
-        'name': 'Sheva Aquila Mahardika',
-        'npm': '2506622033',
-        'education_list': education_list,
+        "name": "Sheva Aquila Mahardika",
+        "npm": "2506622033",
+        "institution_query": request.GET.get("institution", "").strip(),
     }
-    return render(request, 'education.html', context)
+    return render(request, "education.html", context)
 
 
 @role_required(is_owner)

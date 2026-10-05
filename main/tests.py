@@ -273,43 +273,48 @@ class MainTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "education.html")
 
-    def test_education_page_shows_data(self):
+    def test_education_page_renders_only_the_ajax_skeleton(self):
         response = self.client.get(reverse("main:show_education"))
 
-        self.assertContains(response, self.education.institution_name)
-        self.assertContains(response, self.education.field_of_study)
-        self.assertContains(response, "S1 - Sarjana")
-        self.assertContains(response, "2025")
-        self.assertContains(response, "Sekarang")
+        for element_id in [
+            'id="education-loading"',
+            'id="education-error"',
+            'id="education-empty"',
+            'id="education-grid"',
+        ]:
+            self.assertContains(response, element_id)
 
-    def test_completed_education_shows_end_year(self):
+        # Cards come from the JSON endpoint now, so the page must not carry them.
+        self.assertNotContains(response, self.education.field_of_study)
+
+    def test_education_json_reports_the_ongoing_period(self):
+        fields = json.loads(
+            self.client.get(reverse("main:get_education_json")).content
+        )[0]["fields"]
+
+        self.assertEqual(fields["start_year"], 2025)
+        self.assertTrue(fields["is_ongoing"])
+        self.assertIsNone(fields["end_year"])
+
+    def test_education_json_reports_a_finished_period(self):
         self.education.end_year = 2029
         self.education.save()
 
-        response = self.client.get(reverse("main:show_education"))
+        fields = json.loads(
+            self.client.get(reverse("main:get_education_json")).content
+        )[0]["fields"]
 
-        self.assertFalse(self.education.is_ongoing)
-        self.assertContains(response, "2029")
-        self.assertNotContains(response, "Sekarang")
+        self.assertFalse(fields["is_ongoing"])
+        self.assertEqual(fields["end_year"], 2029)
 
-    def test_empty_education_page(self):
+    def test_education_json_is_empty_when_there_is_no_education(self):
         Education.objects.all().delete()
-        response = self.client.get(reverse("main:show_education"))
 
-        self.assertContains(response, "Belum ada riwayat pendidikan yang ditambahkan.")
-
-    def test_education_search_filters_by_institution(self):
-        Education.objects.create(
-            institution_name="SMA Negeri 1",
-            degree="high_school",
-            start_year=2020,
-            end_year=2023,
+        payload = json.loads(
+            self.client.get(reverse("main:get_education_json")).content
         )
 
-        response = self.client.get(reverse("main:show_education"), {"institution": "Indonesia"})
-
-        self.assertContains(response, self.education.institution_name)
-        self.assertNotContains(response, "SMA Negeri 1")
+        self.assertEqual(payload, [])
 
     def test_create_education_form_loads_for_superuser(self):
         self.client.login(username="admin", password="adminpass123")
@@ -628,7 +633,8 @@ class RoleButtonVisibilityTest(TestCase):
 
         education_response = self.education_page()
         self.assertNotContains(education_response, reverse("main:create_education"))
-        self.assertNotContains(education_response, "Hapus")
+        self.assertContains(education_response, 'const EDU_IS_OWNER = "false"')
+        self.assertContains(education_response, 'const EDU_CAN_EDIT = "false"')
 
     def test_regular_user_sees_no_action_buttons(self):
         self.login_as("visitor")
@@ -637,7 +643,9 @@ class RoleButtonVisibilityTest(TestCase):
         self.assertNotContains(project_response, "Tambah Proyek Baru")
         self.assertContains(project_response, 'const CAN_EDIT = "false"')
 
-        self.assertNotContains(self.education_page(), "Hapus")
+        education_response = self.education_page()
+        self.assertNotContains(education_response, reverse("main:create_education"))
+        self.assertContains(education_response, 'const EDU_CAN_EDIT = "false"')
 
     def test_editor_sees_edit_but_not_create_or_delete(self):
         self.login_as("editor")
@@ -648,12 +656,9 @@ class RoleButtonVisibilityTest(TestCase):
         self.assertNotContains(project_response, "Tambah Proyek Baru")
 
         education_response = self.education_page()
-        self.assertContains(
-            education_response,
-            reverse("main:update_education", args=[self.education.id]),
-        )
+        self.assertContains(education_response, 'const EDU_CAN_EDIT = "true"')
+        self.assertContains(education_response, 'const EDU_IS_OWNER = "false"')
         self.assertNotContains(education_response, reverse("main:create_education"))
-        self.assertNotContains(education_response, "Hapus")
 
     def test_owner_sees_every_action_button(self):
         self.login_as("owner")
@@ -665,7 +670,8 @@ class RoleButtonVisibilityTest(TestCase):
 
         education_response = self.education_page()
         self.assertContains(education_response, reverse("main:create_education"))
-        self.assertContains(education_response, "Hapus")
+        self.assertContains(education_response, 'const EDU_IS_OWNER = "true"')
+        self.assertContains(education_response, 'const EDU_CAN_EDIT = "true"')
 
     def test_role_badge_shown_in_navbar(self):
         self.login_as("owner")
