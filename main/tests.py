@@ -97,28 +97,47 @@ class MainTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "project.html")
 
-    def test_project_page_shows_data(self):
+    def test_project_page_renders_only_the_ajax_skeleton(self):
         response = self.client.get(reverse("main:show_projects"))
 
-        self.assertContains(response, self.project.title)
-        self.assertContains(response, self.project.description)
-        self.assertContains(response, "Web Application")
-        self.assertContains(response, self.project.tech_stack)
-        self.assertContains(response, self.project.project_url)
+        for element_id in ['id="loading"', 'id="error"', 'id="empty"', 'id="grid"']:
+            self.assertContains(response, element_id)
 
-    def test_empty_project_page(self):
+        # The cards are built by JavaScript from the JSON endpoint, so the page
+        # itself must not carry the data any more.
+        self.assertNotContains(response, self.project.description)
+
+    def test_project_json_carries_the_card_data(self):
+        payload = json.loads(
+            self.client.get(reverse("main:get_projects_json")).content
+        )
+
+        fields = payload[0]["fields"]
+        self.assertEqual(fields["title"], self.project.title)
+        self.assertEqual(fields["description"], self.project.description)
+        self.assertEqual(fields["category"], "Web Application")
+        self.assertEqual(fields["tech_stack"], self.project.tech_stack)
+        self.assertEqual(fields["project_url"], self.project.project_url)
+
+    def test_project_json_is_empty_when_there_are_no_projects(self):
         Project.objects.all().delete()
-        response = self.client.get(reverse("main:show_projects"))
 
-        self.assertContains(response, "Belum ada project yang ditambahkan.")
+        payload = json.loads(
+            self.client.get(reverse("main:get_projects_json")).content
+        )
 
-    def test_project_search_filters_by_title(self):
+        self.assertEqual(payload, [])
+
+    def test_project_json_search_filters_by_title(self):
         Project.objects.create(title="Lainnya", description="Proyek lain.")
 
-        response = self.client.get(reverse("main:show_projects"), {"title": "Portofolio"})
+        payload = json.loads(
+            self.client.get(reverse("main:get_projects_json"), {"title": "Portofolio"}).content
+        )
 
-        self.assertContains(response, self.project.title)
-        self.assertNotContains(response, "Lainnya")
+        titles = [item["fields"]["title"] for item in payload]
+        self.assertIn(self.project.title, titles)
+        self.assertNotIn("Lainnya", titles)
 
     def test_create_project_form_loads_for_superuser(self):
         self.client.login(username="admin", password="adminpass123")
@@ -175,15 +194,31 @@ class MainTest(TestCase):
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertContains(response, self.project.title)
 
-    def test_projects_json_never_exposes_who_starred(self):
+    def test_projects_json_hides_who_starred_from_everyone_but_the_owner(self):
         self.project.starred_by.add(self.regular_user)
+
+        for role, password in [(None, None), ("visitor", "visitorpass123"), ("editor", "editorpass123")]:
+            with self.subTest(role=role):
+                if role:
+                    self.client.login(username=role, password=password)
+                payload = json.loads(
+                    self.client.get(reverse("main:get_projects_json")).content
+                )
+                self.assertEqual(payload[0]["fields"]["starred_by_names"], "")
+                self.assertNotIn(self.regular_user.username, json.dumps(payload))
+                self.client.logout()
+
+    def test_projects_json_shows_who_starred_to_the_owner(self):
+        self.project.starred_by.add(self.regular_user)
+        self.client.login(username="admin", password="adminpass123")
 
         payload = json.loads(
             self.client.get(reverse("main:get_projects_json")).content
         )
 
-        self.assertNotIn("starred_by", payload[0]["fields"])
-        self.assertNotIn(self.regular_user.username, json.dumps(payload))
+        self.assertEqual(
+            payload[0]["fields"]["starred_by_names"], self.regular_user.username
+        )
 
     def test_education_json_never_exposes_user_data(self):
         payload = json.loads(
@@ -211,7 +246,7 @@ class MainTest(TestCase):
         self.client.post(url)
         self.assertFalse(self.project.starred_by.filter(pk=self.regular_user.pk).exists())
 
-    def test_star_counts_once_per_user_and_is_shown_on_the_page(self):
+    def test_star_counts_once_per_user_and_is_reported_in_json(self):
         self.project.starred_by.add(self.regular_user)
         self.project.starred_by.add(self.regular_user)
         self.project.starred_by.add(self.editor)
@@ -219,8 +254,12 @@ class MainTest(TestCase):
         self.assertEqual(self.project.starred_by.count(), 2)
 
         self.client.login(username="visitor", password="visitorpass123")
-        response = self.client.get(reverse("main:show_projects"))
-        self.assertContains(response, '<span class="star-count">2</span>', html=False)
+        payload = json.loads(
+            self.client.get(reverse("main:get_projects_json")).content
+        )
+
+        self.assertEqual(payload[0]["fields"]["star_count"], 2)
+        self.assertTrue(payload[0]["fields"]["is_starred"])
 
     def test_education_model(self):
         self.assertEqual(
@@ -580,30 +619,33 @@ class RoleButtonVisibilityTest(TestCase):
         return self.client.get(reverse("main:show_education"))
 
     def test_anonymous_sees_no_action_buttons(self):
-        for response, create_url in [
-            (self.project_page(), reverse("main:create_project")),
-            (self.education_page(), reverse("main:create_education")),
-        ]:
-            self.assertNotContains(response, create_url)
-            self.assertNotContains(response, "/edit/")
-            self.assertNotContains(response, "Hapus")
+        # Project cards are built by JavaScript now, so the page only has to
+        # withhold the add-project modal and tell the script which role is viewing.
+        project_response = self.project_page()
+        self.assertNotContains(project_response, "Tambah Proyek Baru")
+        self.assertContains(project_response, 'const IS_OWNER = "false"')
+        self.assertContains(project_response, 'const CAN_EDIT = "false"')
+
+        education_response = self.education_page()
+        self.assertNotContains(education_response, reverse("main:create_education"))
+        self.assertNotContains(education_response, "Hapus")
 
     def test_regular_user_sees_no_action_buttons(self):
         self.login_as("visitor")
 
-        self.assertNotContains(self.project_page(), reverse("main:create_project"))
-        self.assertNotContains(self.project_page(), "/edit/")
+        project_response = self.project_page()
+        self.assertNotContains(project_response, "Tambah Proyek Baru")
+        self.assertContains(project_response, 'const CAN_EDIT = "false"')
+
         self.assertNotContains(self.education_page(), "Hapus")
 
     def test_editor_sees_edit_but_not_create_or_delete(self):
         self.login_as("editor")
 
         project_response = self.project_page()
-        self.assertContains(
-            project_response, reverse("main:update_project", args=[self.project.id])
-        )
-        self.assertNotContains(project_response, reverse("main:create_project"))
-        self.assertNotContains(project_response, "Hapus")
+        self.assertContains(project_response, 'const CAN_EDIT = "true"')
+        self.assertContains(project_response, 'const IS_OWNER = "false"')
+        self.assertNotContains(project_response, "Tambah Proyek Baru")
 
         education_response = self.education_page()
         self.assertContains(
@@ -617,11 +659,9 @@ class RoleButtonVisibilityTest(TestCase):
         self.login_as("owner")
 
         project_response = self.project_page()
-        self.assertContains(project_response, reverse("main:create_project"))
-        self.assertContains(
-            project_response, reverse("main:update_project", args=[self.project.id])
-        )
-        self.assertContains(project_response, "Hapus")
+        self.assertContains(project_response, "Tambah Proyek Baru")
+        self.assertContains(project_response, 'const IS_OWNER = "true"')
+        self.assertContains(project_response, 'const CAN_EDIT = "true"')
 
         education_response = self.education_page()
         self.assertContains(education_response, reverse("main:create_education"))
@@ -638,3 +678,77 @@ class RoleButtonVisibilityTest(TestCase):
         self.client.logout()
         self.login_as("visitor")
         self.assertNotContains(self.project_page(), "role-badge")
+
+
+class CreateProjectAjaxTest(TestCase):
+    """The AJAX add-project endpoint from Tutorial 05."""
+
+    XSS_PAYLOAD = "<img src=x onerror=alert('XSS!')>"
+
+    def setUp(self):
+        User.objects.create_superuser(username="owner", password="ownerpass123")
+        User.objects.create_user(username="visitor", password="visitorpass123")
+        self.url = reverse("main:create_project_ajax")
+        self.valid_payload = {
+            "title": "Proyek AJAX",
+            "description": "Dibuat lewat fetch.",
+            "category": "web",
+            "tech_stack": "Django",
+            "project_url": "",
+            "project_image_url": "",
+        }
+
+    def test_owner_gets_201_and_the_project_is_saved(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        response = self.client.post(self.url, self.valid_payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertTrue(Project.objects.filter(title="Proyek AJAX").exists())
+
+    def test_invalid_input_gets_400_with_field_errors(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        response = self.client.post(self.url, {**self.valid_payload, "title": "   "})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("title", json.loads(response.content)["errors"])
+
+    def test_anonymous_and_regular_users_get_a_json_403(self):
+        for role in [None, "visitor"]:
+            with self.subTest(role=role):
+                if role:
+                    self.client.login(username=role, password="visitorpass123")
+
+                response = self.client.post(self.url, self.valid_payload)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertIn("message", json.loads(response.content))
+                self.assertFalse(Project.objects.filter(title="Proyek AJAX").exists())
+                self.client.logout()
+
+    def test_get_is_not_allowed(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_title_that_is_only_html_is_rejected(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        response = self.client.post(self.url, {**self.valid_payload, "title": self.XSS_PAYLOAD})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Project.objects.filter(description="Dibuat lewat fetch.").exists())
+
+    def test_html_tags_are_stripped_from_saved_text(self):
+        self.client.login(username="owner", password="ownerpass123")
+
+        self.client.post(self.url, {
+            **self.valid_payload,
+            "description": "Halo <b>dunia</b> <script>alert(1)</script>",
+        })
+
+        project = Project.objects.get(title="Proyek AJAX")
+        self.assertNotIn("<", project.description)
+        self.assertIn("Halo dunia", project.description)

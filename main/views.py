@@ -5,8 +5,9 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core import serializers
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from main.forms import EducationForm, ProjectForm
 from main.models import Education, Experience, Project
@@ -36,47 +37,52 @@ def show_experience(request):
     return render(request, 'experience.html', context)
 
 
-# starred_by is deliberately absent: it would expose the usernames of everyone
-# who starred a project to this public, unauthenticated endpoint.
-PUBLIC_PROJECT_FIELDS = [
-    "title",
-    "description",
-    "category",
-    "tech_stack",
-    "project_url",
-    "project_image_url",
-    "created_at",
-]
-
-
 def get_projects_json(request):
-    projects = Project.objects.all()
+    title_query = request.GET.get("title", "").strip()
+    projects = Project.objects.prefetch_related("starred_by").all()
 
-    title = request.GET.get("title", "")
-    if title:
-        projects = projects.filter(title__icontains=title)
+    if title_query:
+        projects = projects.filter(title__icontains=title_query)
 
-    projects_json = serializers.serialize("json", projects, fields=PUBLIC_PROJECT_FIELDS)
-    return HttpResponse(projects_json, content_type="application/json")
+    data = []
+    for project in projects:
+        starred_users = list(project.starred_by.all())
+        is_starred = request.user in starred_users if request.user.is_authenticated else False
+
+        # This endpoint is public, so the names stay owner-only: listing them for
+        # everyone would let any visitor enumerate registered accounts.
+        starred_by_names = (
+            ", ".join(user.username for user in starred_users)
+            if is_owner(request.user)
+            else ""
+        )
+
+        data.append({
+            "pk": str(project.id),
+            "fields": {
+                "title": project.title,
+                "description": project.description,
+                "category": project.get_category_display(),
+                "tech_stack": project.tech_stack,
+                "project_url": project.project_url,
+                "project_image_url": project.project_image_url,
+                "star_count": len(starred_users),
+                "is_starred": is_starred,
+                "starred_by_names": starred_by_names,
+            },
+        })
+
+    return JsonResponse(data, safe=False)
 
 
 def show_projects(request):
-    response = get_projects_json(request)
-    project_list = [entry.object for entry in serializers.deserialize("json", response.content)]
-
-    for project in project_list:
-        project.star_count = project.starred_by.count()
-        project.is_starred_by_user = (
-            request.user.is_authenticated
-            and project.starred_by.filter(pk=request.user.pk).exists()
-        )
-
     context = {
-        'name': 'Sheva Aquila Mahardika',
-        'npm': '2506622033',
-        'project_list': project_list,
+        "name": "Sheva Aquila Mahardika",
+        "npm": "2506622033",
+        "title_query": request.GET.get("title", "").strip(),
+        "form": ProjectForm(),
     }
-    return render(request, 'project.html', context)
+    return render(request, "project.html", context)
 
 
 @role_required(is_owner)
@@ -93,6 +99,29 @@ def create_project(request):
         "form": form,
     }
     return render(request, "projects_form.html", context)
+
+
+# No @login_required here: it redirects to the login page, which fetch() follows
+# and reads as a 200 HTML response, hiding the failure from JavaScript. A plain
+# role check lets anonymous and regular users both get a readable JSON 403.
+@require_POST
+def create_project_ajax(request):
+    if not is_owner(request.user):
+        return JsonResponse(
+            {"message": "Hanya pemilik portofolio yang dapat menambahkan proyek."},
+            status=403,
+        )
+
+    form = ProjectForm(request.POST)
+
+    if form.is_valid():
+        project = form.save()
+        return JsonResponse(
+            {"message": "Proyek berhasil ditambahkan.", "pk": str(project.id)},
+            status=201,
+        )
+
+    return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
 
 
 @role_required(can_edit)
