@@ -54,8 +54,10 @@
     {% endif %}
 
     <script>
-        const EDUCATION_ENDPOINT = "{% url 'main:get_education_json' %}";
-        const CREATE_EDUCATION_ENDPOINT = "{% url 'main:create_education_ajax' %}";
+        const EDUCATION_ENDPOINT = "{% url 'api:education-list' %}";
+        const CREATE_EDUCATION_ENDPOINT = EDUCATION_ENDPOINT;
+        const DETAIL_EDUCATION_ENDPOINT = "{% url 'api:education-detail' 0 %}";
+        const STAR_EDUCATION_ENDPOINT = "{% url 'api:education-star' 0 %}";
         const EDU_IS_OWNER = "{{ is_owner|yesno:'true,false' }}" === "true";
         const EDU_CAN_EDIT = "{{ can_edit|yesno:'true,false' }}" === "true";
         const EDU_IS_AUTHENTICATED = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
@@ -79,16 +81,13 @@
             eduGridContainer.classList.toggle('hide', !showGrid);
         }
 
-        function buildEducationCardElement(item) {
-            const education = item.fields;
-            const educationId = item.pk;
+        function buildEducationCardElement(education) {
+            const educationId = education.id;
 
             const articleElement = document.createElement('article');
             articleElement.className = 'experience-card project-card';
 
-            const starUrl = "{% url 'main:toggle_star_education' 0 %}".replace('/0/', `/${educationId}/`);
             const editUrl = "{% url 'main:update_education' 0 %}".replace('/0/', `/${educationId}/`);
-            const deleteUrl = "{% url 'main:delete_education' 0 %}".replace('/0/', `/${educationId}/`);
 
             const period = education.is_ongoing
                 ? `${escapeHtml(education.start_year)} &ndash; Sekarang`
@@ -109,25 +108,19 @@
                 : (education.star_count > 0 ? `Dibintangi ${education.star_count} pengguna` : 'Jadilah yang pertama memberi star');
 
             const starHtml = EDU_IS_AUTHENTICATED
-                ? `<form method="post" action="${starUrl}" class="star-form">
-                       {% csrf_token %}
-                       <button type="submit" class="button-star${isStarredClass}" title="${starTitle}">${starSymbol}</button>
-                   </form>`
-                : `<span class="button-star" title="Login untuk memberi star">&#9734;</span>`;
+                ? `<button type="button" data-action="star" data-id="${educationId}" class="button-star${isStarredClass}" title="${starTitle}">${starSymbol}</button>`
+                : `<a href="{% url 'main:login' %}" class="button-star" title="Login untuk memberi star">&#9734;</a>`;
 
             const editHtml = EDU_CAN_EDIT
                 ? `<a href="${editUrl}" class="social-link">Edit</a>`
                 : '';
 
             const deleteHtml = EDU_IS_OWNER
-                ? `<form method="post" action="${deleteUrl}" style="display:inline;">
-                       {% csrf_token %}
-                       <button type="submit" class="button-danger" onclick="return confirm('Yakin ingin menghapus riwayat pendidikan ini?');">Hapus</button>
-                   </form>`
+                ? `<button type="button" data-action="delete" data-id="${educationId}" class="button-danger">Hapus</button>`
                 : '';
 
             articleElement.innerHTML = `
-                <span class="experience-category">${escapeHtml(education.degree)}</span>
+                <span class="experience-category">${escapeHtml(education.degree_display)}</span>
                 <h2>${escapeHtml(education.institution_name)}</h2>
                 ${fieldHtml}
                 <p class="experience-status">${period}</p>
@@ -200,37 +193,45 @@
 
         async function addEducation(event) {
             event.preventDefault();
-
             const submitButton = educationForm.querySelector('button[type="submit"]');
             submitButton.disabled = true;
-
             try {
-                const response = await fetch(CREATE_EDUCATION_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-                    body: new FormData(educationForm),
-                });
-
-                const result = await response.json().catch(() => ({}));
-
-                if (response.ok) {
-                    educationForm.reset();
-                    closeEducationModal();
-                    showToast('Berhasil', 'Riwayat pendidikan berhasil ditambahkan!', 'success');
-                    fetchEducation(eduSearchInput.value.trim());
-                } else {
-                    const errorMessages = result.errors
-                        ? Object.values(result.errors).flat().map(error => error.message)
-                        : [result.message || `Terjadi kesalahan (status ${response.status}).`];
-                    showToast('Gagal menambahkan riwayat', errorMessages.join(' '), 'error');
-                }
+                const formData = new FormData(educationForm);
+                const payload = Object.fromEntries(
+                    ['institution_name', 'degree', 'field_of_study', 'start_year', 'end_year', 'description'].map(field => [field, formData.get(field)])
+                );
+                payload.start_year = Number(payload.start_year);
+                payload.end_year = payload.end_year === '' ? null : Number(payload.end_year);
+                await writeProject(CREATE_EDUCATION_ENDPOINT, 'POST', payload);
+                educationForm.reset();
+                closeEducationModal();
+                showToast('Berhasil', 'Data berhasil ditambahkan!', 'success');
+                await fetchEducation(eduSearchInput.value.trim());
             } catch (error) {
-                console.error('Error adding education:', error);
-                showToast('Gagal menambahkan riwayat', 'Tidak dapat terhubung ke server. Silakan coba lagi.', 'error');
+                showToast('Gagal menambahkan data', error.message, 'error');
             } finally {
                 submitButton.disabled = false;
             }
         }
+
+        eduGridContainer.addEventListener('click', async function(event) {
+            const button = event.target.closest('button[data-action]');
+            if (!button || button.disabled) return;
+            const action = button.dataset.action;
+            if (!['star', 'delete'].includes(action)) return;
+            if (action === 'delete' && !window.confirm('Yakin ingin menghapus data ini?')) return;
+            button.disabled = true;
+            try {
+                const pattern = action === 'star' ? STAR_EDUCATION_ENDPOINT : DETAIL_EDUCATION_ENDPOINT;
+                await writeProject(projectEndpoint(pattern, button.dataset.id), action === 'star' ? 'POST' : 'DELETE');
+                showToast('Berhasil', action === 'star' ? 'Star diperbarui.' : 'Data dihapus.', 'success');
+                await fetchEducation(eduSearchInput.value.trim());
+            } catch (error) {
+                showToast('Permintaan gagal', error.message, 'error');
+            } finally {
+                button.disabled = false;
+            }
+        });
 
         // The modal renders for the owner only, so this is null for everyone else;
         // an unguarded addEventListener would throw and stop fetchEducation below.

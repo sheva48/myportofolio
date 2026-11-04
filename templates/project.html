@@ -54,10 +54,12 @@
     {% endif %}
 
     <script>
-        const BASE_PROJECTS_ENDPOINT = "{% url 'main:get_projects_json' %}";
-        const CREATE_PROJECT_ENDPOINT = "{% url 'main:create_project_ajax' %}";
+        const BASE_PROJECTS_ENDPOINT = "{% url 'api:project-list' %}";
+        const CREATE_PROJECT_ENDPOINT = BASE_PROJECTS_ENDPOINT;
+        const DETAIL_PROJECT_ENDPOINT = "{% url 'api:project-detail' 0 %}";
+        const STAR_PROJECT_ENDPOINT = "{% url 'api:project-star' 0 %}";
         const IS_OWNER = "{{ is_owner|yesno:'true,false' }}" === "true";
-        const CAN_EDIT = "{{ can_edit|yesno:'true,false' }}" === "true";
+        const CAN_EDIT = "{{ is_owner|yesno:'true,false' }}" === "true";
         const IS_AUTHENTICATED = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
         const SEARCH_DEBOUNCE_DELAY = 300;
 
@@ -79,16 +81,13 @@
             gridContainer.classList.toggle('hide', !showGrid);
         }
 
-        function buildProjectCardElement(item) {
-            const project = item.fields;
-            const projectId = item.pk;
+        function buildProjectCardElement(project) {
+            const projectId = project.id;
 
             const articleElement = document.createElement('article');
             articleElement.className = 'experience-card project-card';
 
-            const starUrl = "{% url 'main:toggle_star' 0 %}".replace('/0/', `/${projectId}/`);
             const editUrl = "{% url 'main:update_project' 0 %}".replace('/0/', `/${projectId}/`);
-            const deleteUrl = "{% url 'main:delete_project' 0 %}".replace('/0/', `/${projectId}/`);
 
             const imageHtml = project.project_image_url
                 ? `<img src="${escapeHtml(project.project_image_url)}" alt="Gambar ${escapeHtml(project.title)}" class="project-image">`
@@ -109,26 +108,20 @@
                 : (project.star_count > 0 ? `Dibintangi ${project.star_count} pengguna` : 'Jadilah yang pertama memberi star');
 
             const starHtml = IS_AUTHENTICATED
-                ? `<form method="post" action="${starUrl}" class="star-form">
-                       {% csrf_token %}
-                       <button type="submit" class="button-star${isStarredClass}" title="${starTitle}">${starSymbol}</button>
-                   </form>`
-                : `<span class="button-star" title="Login untuk memberi star">&#9734;</span>`;
+                ? `<button type="button" data-action="star" data-id="${projectId}" class="button-star${isStarredClass}" title="${starTitle}">${starSymbol}</button>`
+                : `<a href="{% url 'main:login' %}" class="button-star" title="Login untuk memberi star">&#9734;</a>`;
 
             const editHtml = CAN_EDIT
                 ? `<a href="${editUrl}" class="social-link">Edit</a>`
                 : '';
 
             const deleteHtml = IS_OWNER
-                ? `<form method="post" action="${deleteUrl}" style="display:inline;">
-                       {% csrf_token %}
-                       <button type="submit" class="button-danger" onclick="return confirm('Yakin ingin menghapus project ini?');">Hapus</button>
-                   </form>`
+                ? `<button type="button" data-action="delete" data-id="${projectId}" class="button-danger">Hapus</button>`
                 : '';
 
             articleElement.innerHTML = `
                 ${imageHtml}
-                <span class="experience-category">${escapeHtml(project.category)}</span>
+                <span class="experience-category">${escapeHtml(project.category_display)}</span>
                 <h2>${escapeHtml(project.title)}</h2>
                 <p class="experience-description">${escapeHtml(project.description)}</p>
                 ${techStackHtml}
@@ -201,37 +194,43 @@
 
         async function addProject(event) {
             event.preventDefault();
-
             const submitButton = projectForm.querySelector('button[type="submit"]');
             submitButton.disabled = true;
-
             try {
-                const response = await fetch(CREATE_PROJECT_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-                    body: new FormData(projectForm),
-                });
-
-                const result = await response.json().catch(() => ({}));
-
-                if (response.ok) {
-                    projectForm.reset();
-                    closeProjectModal();
-                    showToast('Berhasil', 'Proyek baru berhasil ditambahkan!', 'success');
-                    fetchProjects(searchInput.value.trim());
-                } else {
-                    const errorMessages = result.errors
-                        ? Object.values(result.errors).flat().map(error => error.message)
-                        : [result.message || `Terjadi kesalahan (status ${response.status}).`];
-                    showToast('Gagal menambahkan proyek', errorMessages.join(' '), 'error');
-                }
+                const formData = new FormData(projectForm);
+                const payload = Object.fromEntries(
+                    ['title', 'description', 'category', 'tech_stack', 'project_url', 'project_image_url'].map(field => [field, formData.get(field)])
+                );
+                await writeProject(CREATE_PROJECT_ENDPOINT, 'POST', payload);
+                projectForm.reset();
+                closeProjectModal();
+                showToast('Berhasil', 'Data berhasil ditambahkan!', 'success');
+                await fetchProjects(searchInput.value.trim());
             } catch (error) {
-                console.error('Error adding project:', error);
-                showToast('Gagal menambahkan proyek', 'Tidak dapat terhubung ke server. Silakan coba lagi.', 'error');
+                showToast('Gagal menambahkan data', error.message, 'error');
             } finally {
                 submitButton.disabled = false;
             }
         }
+
+        gridContainer.addEventListener('click', async function(event) {
+            const button = event.target.closest('button[data-action]');
+            if (!button || button.disabled) return;
+            const action = button.dataset.action;
+            if (!['star', 'delete'].includes(action)) return;
+            if (action === 'delete' && !window.confirm('Yakin ingin menghapus data ini?')) return;
+            button.disabled = true;
+            try {
+                const pattern = action === 'star' ? STAR_PROJECT_ENDPOINT : DETAIL_PROJECT_ENDPOINT;
+                await writeProject(projectEndpoint(pattern, button.dataset.id), action === 'star' ? 'POST' : 'DELETE');
+                showToast('Berhasil', action === 'star' ? 'Star diperbarui.' : 'Data dihapus.', 'success');
+                await fetchProjects(searchInput.value.trim());
+            } catch (error) {
+                showToast('Permintaan gagal', error.message, 'error');
+            } finally {
+                button.disabled = false;
+            }
+        });
 
         // The modal only renders for the owner, so this is null for everyone else;
         // attaching the listener unguarded would throw and stop fetchProjects below.

@@ -2,6 +2,7 @@ from functools import wraps
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 EDITOR_GROUP_NAME = "Editor"
 
@@ -32,3 +33,19 @@ def role_required(predicate):
         return _wrapped
 
     return decorator
+
+
+class IsPortfolioOwnerOrReadOnly(BasePermission):
+    message = "Only the portfolio owner can change projects."
+
+    def has_permission(self, request, view):
+        return request.method in SAFE_METHODS or is_owner(request.user)
+
+
+class IsPortfolioOwnerOrEditorOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.method in SAFE_METHODS
+            or is_owner(request.user)
+            or (request.method in ("PUT", "PATCH") and is_editor(request.user))
+        )

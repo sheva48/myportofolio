@@ -651,7 +651,7 @@ class RoleButtonVisibilityTest(TestCase):
         self.login_as("editor")
 
         project_response = self.project_page()
-        self.assertContains(project_response, 'const CAN_EDIT = "true"')
+        self.assertContains(project_response, 'const CAN_EDIT = "false"')
         self.assertContains(project_response, 'const IS_OWNER = "false"')
         self.assertNotContains(project_response, "Tambah Proyek Baru")
 
