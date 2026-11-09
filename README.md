@@ -137,3 +137,26 @@ Endpoint JSON-nya aman tidak? Cek apakah ada data pengguna yang bocor ke publik.
 
 Uji perlindungan XSS-nya dengan payload yang ada di tutorial, lalu tunjukkan data yang akhirnya tersimpan di database.
 
+TUGAS 06
+
+1. Apa itu REST dan kenapa JSON saja belum cukup? Apa bedanya PUT dan PATCH?
+REST adalah gaya arsitektur API yang mengatur interaksi dengan resource lewat URL, method HTTP, dan status response yang sesuai. Balikin JSON saja belum cukup karena JSON cuma format data, sedangkan REST juga mengatur cara API digunakan, misalnya GET buat membaca dan DELETE buat menghapus.
+
+PUT dipakai buat mengganti representasi data secara lengkap, sedangkan PATCH buat mengubah sebagian field. Contohnya, memperbarui seluruh data Education bisa pakai PUT, sementara mengganti description saja cukup pakai PATCH.
+
+2. Apa peran serializer pada Django REST Framework?
+Serializer mengubah objek model menjadi data yang bisa ditampilkan sebagai JSON, sekaligus memvalidasi input sebelum disimpan. Dibanding merakit dictionary manual lewat JsonResponse, ModelSerializer lebih praktis karena mengikuti field dan aturan model. Di proyek ini EducationSerializer juga membersihkan teks pakai strip_tags dan menyediakan jumlah serta status star sebagai field read-only.
+
+3. Apa bedanya autentikasi dan otorisasi?
+Autentikasi memeriksa siapa pengguna yang mengirim request, sedangkan otorisasi menentukan tindakan yang boleh dilakukan pengguna tersebut. Contohnya, pengguna biasa boleh memberi star, Editor boleh mengedit, dan pemilik boleh menambah serta menghapus data.
+
+Permission harus diperiksa di server karena menyembunyikan tombol cuma membatasi tampilan. Pengguna tetap bisa mengirim request langsung ke API tanpa memakai tombol tersebut.
+
+4. Kenapa SessionAuthentication tetap perlu CSRF? Kenapa force_authenticate belum cukup?
+Browser otomatis menyertakan cookie session saat mengirim request, sehingga situs lain bisa mencoba mengirim tindakan atas nama pengguna yang sedang login. Token CSRF membantu server memeriksa bahwa request yang mengubah data membawa token yang sesuai.
+
+force_authenticate melewati proses autentikasi normal sehingga belum membuktikan perlindungan CSRF bekerja. Karena itu test memakai APIClient(enforce_csrf_checks=True) dan .login(), lalu memastikan request tanpa token ditolak dengan status 403.
+
+AI Disclosure
+
+Untuk Tugas 6 saya memakai AI (Codex) buat memeriksa kesesuaian kode dengan instruksi, memberikan arahan untuk merubah form edit Education agar menyimpan lewat PATCH API, dan memperkuat test permission serta CSRF. Saya meminta penjelasan perubahan sebelum pengerjaan dan mengecek ulang hasilnya terhadap PDF tugas. Seluruh 107 test berhasil dijalankan, dan menjelaskna seluruh alur yang akan terbuat pada tugas 06 ini 
