@@ -7,7 +7,7 @@
         <section class="experience-section">
             <div class="container">
                 <h1>{% if education %}Edit Riwayat Pendidikan{% else %}Tambah Riwayat Pendidikan{% endif %}</h1>
-                <form method="post"
+                <form id="education-detail-form" method="post"
                       action="{% if education %}{% url 'main:update_education' education.id %}{% else %}{% url 'main:create_education' %}{% endif %}"
                       class="project-form">
                     {% csrf_token %}
@@ -27,3 +27,30 @@
         </section>
     </main>
 {% endblock content %}
+{% block scripts %}
+    {% if education %}
+        <script>
+            const editEducationForm = document.getElementById('education-detail-form');
+            editEducationForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const submitButton = editEducationForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                try {
+                    const formData = new FormData(editEducationForm);
+                    const payload = Object.fromEntries(
+                        ['institution_name', 'degree', 'field_of_study', 'start_year', 'end_year', 'description']
+                            .map(field => [field, formData.get(field)])
+                    );
+                    payload.start_year = Number(payload.start_year);
+                    payload.end_year = payload.end_year === '' ? null : Number(payload.end_year);
+                    await writeProject("{% url 'api:education-detail' education.id %}", 'PATCH', payload);
+                    showToast('Berhasil', 'Riwayat pendidikan berhasil diperbarui!', 'success');
+                } catch (error) {
+                    showToast('Gagal memperbarui data', error.message, 'error');
+                } finally {
+                    submitButton.disabled = false;
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock scripts %}

@@ -194,6 +194,9 @@ class EducationAPITest(APITestCase):
         self.assertEqual(self.client.post(self.list_url, self.payload, format="json").status_code, 403)
         self.assertEqual(self.client.delete(self.detail_url).status_code, 403)
         self.assertTrue(self.model.objects.filter(pk=self.education.pk).exists())
+        self.assertEqual(self.model.objects.count(), 1)
+        self.education.refresh_from_db()
+        self.assertEqual(self.education.institution_name, self.payload["institution_name"])
 
     def test_owner_create_update_delete(self):
         self.client.force_authenticate(user=self.owner)
@@ -233,6 +236,7 @@ class EducationAPITest(APITestCase):
 
     def test_star_uses_session_user_and_computed_fields_cannot_be_written(self):
         self.assertEqual(self.client.post(self.star_url).status_code, 403)
+        self.assertEqual(self.education.starred_by.count(), 0)
         self.client.force_authenticate(user=self.visitor)
         response = self.client.post(self.star_url, {"starred_by": self.owner.pk}, format="json")
         self.assertTrue(response.data["is_starred"])
@@ -271,12 +275,46 @@ class EducationAPITest(APITestCase):
             client = APIClient(enforce_csrf_checks=True)
             self.assertTrue(client.login(username=user.username, password="test-password"))
             self.assertEqual(client.patch(self.detail_url, {"description": "Updated"}, format="json").status_code, 403)
+            self.education.refresh_from_db()
+            self.assertEqual(self.education.description, "")
             page = client.get(self.list_url, HTTP_ACCEPT="text/html")
             self.assertEqual(page.status_code, 200)
             token = client.cookies["csrftoken"].value
             self.assertEqual(client.patch(self.detail_url, {"description": "Updated"}, format="json", HTTP_X_CSRFTOKEN=token).status_code, 200)
             self.assertEqual(client.post(self.star_url).status_code, 403)
+            self.assertFalse(self.education.starred_by.filter(pk=user.pk).exists())
             self.assertEqual(client.post(self.star_url, HTTP_X_CSRFTOKEN=token).status_code, 200)
+            self.education.description = ""
+            self.education.save(update_fields=["description"])
+
+    def test_edit_page_supports_api_patch_for_editor_and_owner(self):
+        url = reverse("main:update_education", args=[self.education.pk])
+        for user in (self.editor, self.owner):
+            client = APIClient(enforce_csrf_checks=True)
+            self.assertTrue(client.login(username=user.username, password="test-password"))
+            response = client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, self.detail_url)
+            self.assertContains(response, "'PATCH', payload")
+            self.assertContains(response, "event.preventDefault()")
+            token = client.cookies["csrftoken"].value
+            response = client.patch(
+                self.detail_url, {"description": "<b>Updated through API</b>"},
+                format="json", HTTP_X_CSRFTOKEN=token,
+            )
+            self.assertEqual(response.status_code, 200)
+            self.education.refresh_from_db()
+            self.assertEqual(self.education.description, "Updated through API")
+
+    def test_regular_user_gets_csrf_cookie_from_education_page(self):
+        client = APIClient(enforce_csrf_checks=True)
+        self.assertTrue(client.login(username=self.visitor.username, password="test-password"))
+        self.assertEqual(client.get(reverse("main:show_education")).status_code, 200)
+        self.assertEqual(client.post(self.star_url).status_code, 403)
+        self.assertEqual(self.education.starred_by.count(), 0)
+        response = client.post(self.star_url, HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self.education.starred_by.filter(pk=self.visitor.pk).exists())
 
 
 class APIIntegrationTest(APITestCase):
